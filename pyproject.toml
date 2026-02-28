@@ -1,0 +1,45 @@
+[project]
+name = "echoes-of-kin"
+version = "1.0.0"
+description = "AI-powered voice cloning conversation system for simulating kinship calls"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{name = "Your Name", email = "your.email@example.com"}]
+keywords = ["ai", "voice-cloning", "conversation", "mistral", "elevenlabs", "whisper"]
+
+dependencies = [
+    "fastapi==0.109.0",
+    "uvicorn==0.27.0",
+    "streamlit==1.31.0",
+    "python-multipart==0.0.6",
+    "mistralai==0.1.3",
+    "elevenlabs==0.2.27",
+    "openai-whisper==20231117",
+    "transformers==4.37.0",
+    "torch==2.1.2",
+    "pydub==0.25.1",
+    "soundfile==0.12.1",
+    "librosa==0.10.1",
+    "wandb==0.16.3",
+    "weave==0.50.0",
+    "python-dotenv==1.0.0",
+    "aiofiles==23.2.1",
+    "requests==2.31.0",
+    "numpy==1.26.3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==7.4.4",
+    "black==23.12.1",
+    "flake8==6.1.0",
+    "mypy==1.8.0",
+]
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.uv]
+# uv configuration  
+no-binary-package = []
