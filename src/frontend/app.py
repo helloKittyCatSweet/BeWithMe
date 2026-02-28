@@ -6,6 +6,10 @@ import streamlit as st
 import requests
 import tempfile
 import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Page Configuration
 st.set_page_config(
@@ -15,8 +19,8 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# API Base URL
-API_BASE_URL = "http://localhost:8000"
+# API Base URL from environment variable
+API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
 
 # Custom CSS Styling
 st.markdown("""
