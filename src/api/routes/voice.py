@@ -2,15 +2,24 @@
 音色克隆相关的 API 路由
 Voice Cloning Routes
 """
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException
-from typing import List
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
+from fastapi.responses import FileResponse
+from sqlalchemy.orm import Session
+from typing import List, Optional
 import tempfile
 import os
 import logging
 
 from ...core.voice_cloning import VoiceCloner
-from ...core.asr import analyze_voice_sample
+from ...core.asr import analyze_voice_sample, transcribe_audio
+from ...core.conversation import ConversationAgent
 from ..models import VoiceInfo, CloneVoiceResponse
+from ...database import (
+    get_db, 
+    check_relationship_valid, 
+    create_voice_profile,
+    log_action
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/voice", tags=["voice"])
@@ -23,7 +32,10 @@ voice_cloner = VoiceCloner()
 async def clone_voice(
     audio_file: UploadFile = File(...),
     voice_name: str = Form(...),
-    description: str = Form("克隆的亲人声音")
+    description: str = Form("克隆的亲人声音"),
+    user_id: int = Form(...),  # 实际应用中从 JWT token 获取
+    relationship_id: Optional[int] = Form(None),  # 关系 ID（可选：用于演示）
+    db: Session = Depends(get_db)
 ) -> CloneVoiceResponse:
     """
     上传音频克隆音色
@@ -31,7 +43,24 @@ async def clone_voice(
     - **audio_file**: 30秒音频文件 (.mp3 或 .wav)
     - **voice_name**: 音色名称
     - **description**: 音色描述
+    - **user_id**: 用户 ID
+    - **relationship_id**: 亲属关系 ID（如果提供，将验证关系）
     """
+    # 如果提供了关系 ID，验证关系有效性
+    if relationship_id is not None:
+        if not check_relationship_valid(db, relationship_id):
+            log_action(db, user_id, "voice_clone_blocked", "VoiceProfile", None,
+                      success=False, error_message="Relationship not verified")
+            raise HTTPException(
+                status_code=403, 
+                detail="亲属关系未通过验证或已过期，无法进行声音克隆。请先完成关系验证。"
+            )
+    else:
+        # 没有提供关系 ID，记录警告日志（演示模式）
+        logger.warning(f"用户 {user_id} 进行声音克隆但未提供关系验证")
+        log_action(db, user_id, "voice_clone_no_verification", "VoiceProfile", None,
+                  details="Voice cloning without relationship verification")
+    
     try:
         # 保存上传的文件
         with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_file:
@@ -53,11 +82,45 @@ async def clone_voice(
         except:
             pass
         
+        # 保存音频文件到永久位置
+        audio_dir = "data/voice_samples"
+        os.makedirs(audio_dir, exist_ok=True)
+        audio_filename = f"voice_{user_id}_{voice_id}.mp3"
+        audio_path = os.path.join(audio_dir, audio_filename)
+        
+        # 复制到永久位置
+        import shutil
+        shutil.copy(tmp_path, audio_path)
+        
         # 清理临时文件
         if os.path.exists(tmp_path):
             os.unlink(tmp_path)
         
         if voice_id:
+            # 创建音色档案记录（如果提供了关系 ID）
+            if relationship_id is not None:
+                try:
+                    voice_profile = create_voice_profile(
+                        db=db,
+                        user_id=user_id,
+                        relationship_id=relationship_id,
+                        voice_id=voice_id,
+                        voice_name=voice_name,
+                        description=description,
+                        source_audio_path=audio_path,
+                        audio_duration=analysis.get("duration") if analysis else None
+                    )
+                    logger.info(f"创建音色档案: {voice_profile.id}")
+                except Exception as e:
+                    logger.error(f"创建音色档案失败: {e}")
+            
+            # 同时设置到 chat 路由中
+            from . import chat
+            chat.current_voice_id = voice_id
+            
+            log_action(db, user_id, "voice_cloned", "VoiceProfile", None,
+                      details=f"Voice ID: {voice_id}, Name: {voice_name}")
+            
             return CloneVoiceResponse(
                 success=True,
                 voice_id=voice_id,
@@ -66,12 +129,16 @@ async def clone_voice(
                 analysis=analysis
             )
         else:
+            log_action(db, user_id, "voice_clone_failed", "VoiceProfile", None,
+                      success=False, error_message="ElevenLabs API failed")
             raise HTTPException(status_code=500, detail="音色克隆失败")
             
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"克隆音色时出错: {str(e)}")
+        log_action(db, user_id, "voice_clone_error", "VoiceProfile", None,
+                  success=False, error_message=str(e))
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -102,3 +169,153 @@ async def delete_voice(voice_id: str):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/simulate-call")
+async def simulate_call(
+    audio_file: UploadFile = File(...),
+    voice_id: str = Form(...),
+    agent_name: Optional[str] = Form("亲人")
+):
+    """
+    🎯 点睛之笔：模拟通话完整流程
+    
+    上传用户录音 → ASR → LLM 生成回复 → TTS → 返回音频
+    
+    - **audio_file**: 用户录音文件 (.mp3, .wav, .m4a)
+    - **voice_id**: 克隆的音色ID
+    - **agent_name**: 对话代理名称（可选）
+    
+    返回: 亲人的语音回复 (MP3)
+    """
+    tmp_input = None
+    tmp_output = None
+    
+    try:
+        # Step 1: 保存用户上传的音频
+        logger.info(f"📞 模拟通话开始 - 接收用户录音")
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_file:
+            content = await audio_file.read()
+            tmp_file.write(content)
+            tmp_input = tmp_file.name
+        
+        # Step 2: ASR - 语音转文字
+        logger.info(f"🎧 正在识别语音...")
+        user_text = transcribe_audio(tmp_input)
+        
+        if not user_text:
+            raise HTTPException(status_code=400, detail="无法识别语音内容")
+        
+        logger.info(f"👤 用户说: {user_text}")
+        
+        # Step 3: LLM 生成回复
+        logger.info(f"🧠 正在生成回复...")
+        
+        # 尝试从 conversation 路由获取当前 agent
+        from . import conversation as conv_module
+        agent = conv_module.current_agent
+        
+        if agent:
+            # 使用已激活的 agent
+            ai_response = agent.chat(user_text)
+        else:
+            # 使用默认的简单回复
+            from ...core.conversation import ConversationAgent
+            default_agent = ConversationAgent(
+                name=agent_name,
+                relationship="亲人",
+                personality_traits="温暖、关怀、耐心",
+                speech_patterns=["说话温柔", "总是关心你"]
+            )
+            ai_response = default_agent.chat(user_text)
+        
+        logger.info(f"👵 AI 回复: {ai_response}")
+        
+        # Step 4: TTS - 文字转语音
+        logger.info(f"🎙️ 正在合成语音...")
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_file:
+            tmp_output = tmp_file.name
+        
+        audio_path = voice_cloner.generate_speech(
+            text=ai_response,
+            voice_id=voice_id,
+            output_path=tmp_output
+        )
+        
+        if not audio_path or not os.path.exists(audio_path):
+            raise HTTPException(status_code=500, detail="语音合成失败")
+        
+        # Step 5: 返回音频文件
+        logger.info(f"✅ 通话完成，返回音频")
+        
+        # 返回文件后自动清理
+        background_tasks = None
+        
+        return FileResponse(
+            path=audio_path,
+            media_type="audio/mpeg",
+            filename="response.mp3",
+            headers={
+                "X-User-Message": user_text,
+                "X-AI-Response": ai_response
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ 模拟通话失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"通话处理失败: {str(e)}")
+    
+    finally:
+        # 清理临时文件
+        if tmp_input and os.path.exists(tmp_input):
+            try:
+                os.unlink(tmp_input)
+            except:
+                pass
+        # 注意: tmp_output 在 FileResponse 返回后才会被自动清理
+
+
+@router.post("/quick-tts")
+async def quick_tts(
+    text: str = Form(...),
+    voice_id: str = Form(...)
+):
+    """
+    快速 TTS 接口（仅文本转语音）
+    
+    - **text**: 要合成的文本
+    - **voice_id**: 音色ID
+    
+    返回: 语音文件 (MP3)
+    """
+    tmp_output = None
+    
+    try:
+        logger.info(f"🎙️ 快速 TTS: {text[:30]}...")
+        
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_file:
+            tmp_output = tmp_file.name
+        
+        audio_path = voice_cloner.generate_speech(
+            text=text,
+            voice_id=voice_id,
+            output_path=tmp_output
+        )
+        
+        if not audio_path or not os.path.exists(audio_path):
+            raise HTTPException(status_code=500, detail="语音合成失败")
+        
+        return FileResponse(
+            path=audio_path,
+            media_type="audio/mpeg",
+            filename="tts_output.mp3"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ TTS 失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+

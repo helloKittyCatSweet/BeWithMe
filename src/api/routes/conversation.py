@@ -38,6 +38,10 @@ async def create_agent(profile: ProfileRequest):
         
         current_agent = agent
         
+        # 同时设置到 chat 路由中
+        from . import chat
+        chat.current_agent = agent
+        
         return CreateAgentResponse(
             success=True,
             message=f"对话代理 '{profile.name}' 创建成功！",

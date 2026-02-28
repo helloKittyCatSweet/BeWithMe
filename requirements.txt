@@ -27,6 +27,9 @@ pyarrow==23.0.1
 wandb>=0.16.4
 weave==0.50.0
 
+# Database
+sqlalchemy==2.0.25
+
 # Utilities
 python-dotenv==1.0.0
 aiofiles==23.2.1

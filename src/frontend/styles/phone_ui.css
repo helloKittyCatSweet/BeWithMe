@@ -1,0 +1,611 @@
+/* ==============================================
+   Be With Me - 手机界面样式
+   Phone UI Styles
+   ============================================== */
+
+/* 全局样式 */
+.stApp {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+}
+
+/* 隐藏 Streamlit 默认元素 */
+#MainMenu {visibility: hidden;}
+footer {visibility: hidden;}
+header {visibility: hidden;}
+
+/* ==============================================
+   手机容器 - 绝对定位层叠结构
+   ============================================== */
+
+/* 主容器 - 居中布局 */
+.phone-wrapper {
+    position: relative;
+    width: 420px;
+    height: 850px;
+    margin: 40px auto;
+    perspective: 1000px;
+}
+
+/* 手机外壳 - 底层 */
+.phone-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #1a1a1a;
+    border-radius: 50px;
+    padding: 18px;
+    box-shadow: 
+        0 30px 80px rgba(0,0,0,0.8),
+        inset 0 0 0 3px rgba(255,255,255,0.1);
+    z-index: 1;
+}
+
+/* 刘海屏 */
+.phone-notch {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 180px;
+    height: 32px;
+    background: #1a1a1a;
+    border-radius: 0 0 24px 24px;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.notch-camera {
+    width: 12px;
+    height: 12px;
+    background: #2a2a2a;
+    border-radius: 50%;
+    margin-right: 8px;
+}
+
+.notch-speaker {
+    width: 60px;
+    height: 6px;
+    background: #2a2a2a;
+    border-radius: 3px;
+}
+
+/* 手机屏幕 - 中层 */
+.phone-screen {
+    position: absolute;
+    top: 18px;
+    left: 18px;
+    right: 18px;
+    bottom: 18px;
+    background: linear-gradient(180deg, #000000 0%, #1a1a1a 100%);
+    border-radius: 38px;
+    overflow: hidden;
+    z-index: 2;
+}
+
+/* 内容区域 - 顶层 */
+.screen-content {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    padding: 50px 20px 20px;
+    overflow-y: auto;
+    z-index: 2;
+}
+
+/* 自定义滚动条 */
+.screen-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.screen-content::-webkit-scrollbar-track {
+    background: rgba(255,255,255,0.05);
+}
+
+.screen-content::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.3);
+    border-radius: 3px;
+}
+
+/* Home 指示器 */
+.home-indicator {
+    position: absolute;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 140px;
+    height: 4px;
+    background: rgba(255,255,255,0.4);
+    border-radius: 2px;
+    z-index: 10;
+}
+
+/* ==============================================
+   状态栏
+   ============================================== */
+
+.status-bar {
+    position: absolute;
+    top: 10px;
+    left: 20px;
+    right: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: white;
+    font-size: 14px;
+    z-index: 10;
+    padding: 0 20px;
+}
+
+.status-time {
+    font-weight: 600;
+}
+
+.status-icons {
+    display: flex;
+    gap: 6px;
+    font-size: 16px;
+}
+
+/* ==============================================
+   联系人列表
+   ============================================== */
+
+.contacts-container {
+    padding: 20px 0;
+}
+
+.contacts-header {
+    color: white;
+    font-size: 32px;
+    font-weight: 700;
+    margin-bottom: 20px;
+    padding: 0 10px;
+}
+
+.contact-card {
+    background: rgba(255,255,255,0.1);
+    backdrop-filter: blur(20px);
+    border-radius: 20px;
+    padding: 20px;
+    margin-bottom: 15px;
+    border: 1px solid rgba(255,255,255,0.15);
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.contact-card:hover {
+    background: rgba(255,255,255,0.2);
+    transform: scale(1.02);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+}
+
+.contact-card:active {
+    transform: scale(0.98);
+}
+
+.contact-header {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.contact-avatar {
+    font-size: 50px;
+    width: 70px;
+    height: 70px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 50%;
+}
+
+.contact-info {
+    flex: 1;
+}
+
+.contact-name {
+    font-size: 22px;
+    font-weight: 600;
+    color: white;
+    margin-bottom: 5px;
+}
+
+.contact-relation {
+    font-size: 14px;
+    color: rgba(255,255,255,0.7);
+}
+
+.contact-actions {
+    display: flex;
+    gap: 10px;
+}
+
+/* ==============================================
+   通话界面
+   ============================================== */
+
+.call-screen {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(180deg, #1a1a2e 0%, #0f0f1e 100%);
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+}
+
+/* 来电界面 */
+.incoming-call {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    height: 100%;
+    padding: 80px 30px 60px;
+}
+
+.caller-info {
+    text-align: center;
+    animation: fadeInDown 0.6s ease;
+}
+
+.caller-avatar {
+    font-size: 120px;
+    margin-bottom: 30px;
+    animation: pulse 2s infinite;
+}
+
+.caller-name {
+    font-size: 36px;
+    font-weight: 700;
+    color: white;
+    margin-bottom: 10px;
+}
+
+.call-status {
+    font-size: 18px;
+    color: rgba(255,255,255,0.7);
+}
+
+.call-actions {
+    display: flex;
+    gap: 60px;
+}
+
+.call-button {
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    border: none;
+    font-size: 32px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+}
+
+.call-button:active {
+    transform: scale(0.9);
+}
+
+.btn-decline {
+    background: linear-gradient(135deg, #ff4757 0%, #ff6b81 100%);
+}
+
+.btn-accept {
+    background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
+}
+
+/* 通话中界面 */
+.in-call {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 60px 20px 30px;
+}
+
+.call-header {
+    text-align: center;
+    margin-bottom: 40px;
+}
+
+.call-avatar {
+    font-size: 100px;
+    margin-bottom: 20px;
+}
+
+.call-name {
+    font-size: 28px;
+    font-weight: 600;
+    color: white;
+    margin-bottom: 10px;
+}
+
+.call-duration {
+    font-size: 16px;
+    color: rgba(255,255,255,0.7);
+    font-variant-numeric: tabular-nums;
+}
+
+/* 音频波形动画 */
+.audio-waves {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    margin: 40px 0;
+    height: 80px;
+    align-items: center;
+}
+
+.wave-bar {
+    width: 5px;
+    background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+    border-radius: 3px;
+    animation: wave 1.2s ease-in-out infinite;
+}
+
+.wave-bar:nth-child(1) { animation-delay: 0s; }
+.wave-bar:nth-child(2) { animation-delay: 0.1s; }
+.wave-bar:nth-child(3) { animation-delay: 0.2s; }
+.wave-bar:nth-child(4) { animation-delay: 0.3s; }
+.wave-bar:nth-child(5) { animation-delay: 0.4s; }
+.wave-bar:nth-child(6) { animation-delay: 0.3s; }
+.wave-bar:nth-child(7) { animation-delay: 0.2s; }
+.wave-bar:nth-child(8) { animation-delay: 0.1s; }
+
+@keyframes wave {
+    0%, 100% { height: 15px; opacity: 0.5; }
+    50% { height: 60px; opacity: 1; }
+}
+
+/* 对话气泡区 */
+.conversation-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 10px;
+    margin-bottom: 20px;
+}
+
+.bubble {
+    max-width: 75%;
+    padding: 12px 16px;
+    border-radius: 20px;
+    margin-bottom: 10px;
+    font-size: 15px;
+    line-height: 1.4;
+    animation: bubbleIn 0.3s ease;
+}
+
+.bubble-user {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    margin-left: auto;
+    border-bottom-right-radius: 4px;
+}
+
+.bubble-agent {
+    background: rgba(255,255,255,0.15);
+    color: white;
+    margin-right: auto;
+    border-bottom-left-radius: 4px;
+}
+
+@keyframes bubbleIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* 控制按钮 */
+.call-controls {
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+    padding: 20px 0;
+}
+
+.control-button {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(255,255,255,0.2);
+    color: white;
+    font-size: 24px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.control-button:hover {
+    background: rgba(255,255,255,0.3);
+    transform: scale(1.1);
+}
+
+.control-button:active {
+    transform: scale(0.95);
+}
+
+.btn-hangup {
+    background: linear-gradient(135deg, #ff4757 0%, #ff6b81 100%);
+    width: 70px;
+    height: 70px;
+    font-size: 28px;
+}
+
+/* ==============================================
+   底部标签栏
+   ============================================== */
+
+.tab-bar {
+    position: absolute;
+    bottom: 30px;
+    left: 20px;
+    right: 20px;
+    height: 60px;
+    background: rgba(0,0,0,0.5);
+    backdrop-filter: blur(20px);
+    border-radius: 30px;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    z-index: 50;
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+.tab-item {
+    flex: 1;
+    text-align: center;
+    color: rgba(255,255,255,0.6);
+    font-size: 24px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    padding: 10px;
+}
+
+.tab-item:hover {
+    color: white;
+    transform: scale(1.1);
+}
+
+.tab-item.active {
+    color: white;
+}
+
+/* ==============================================
+   通话记录
+   ============================================== */
+
+.records-container {
+    padding: 20px 0;
+}
+
+.records-header {
+    color: white;
+    font-size: 32px;
+    font-weight: 700;
+    margin-bottom: 20px;
+    padding: 0 10px;
+}
+
+.record-card {
+    background: rgba(255,255,255,0.1);
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 12px;
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+.record-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.record-name {
+    font-size: 18px;
+    font-weight: 600;
+    color: white;
+}
+
+.record-time {
+    font-size: 14px;
+    color: rgba(255,255,255,0.6);
+}
+
+.record-details {
+    font-size: 14px;
+    color: rgba(255,255,255,0.7);
+}
+
+/* ==============================================
+   输入控制面板
+   ============================================== */
+
+.controls-panel {
+    padding: 20px;
+    background: rgba(0,0,0,0.3);
+    border-radius: 20px;
+    margin-top: 20px;
+}
+
+/* ==============================================
+   动画效果
+   ============================================== */
+
+@keyframes fadeInDown {
+    from {
+        opacity: 0;
+        transform: translateY(-30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes pulse {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.05);
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+/* ==============================================
+   响应式设计
+   ============================================== */
+
+@media (max-width: 480px) {
+    .phone-wrapper {
+        width: 95vw;
+        height: 95vh;
+        margin: 2.5vh auto;
+    }
+}
+
+/* ==============================================
+   实用工具类
+   ============================================== */
+
+.text-center {
+    text-align: center;
+}
+
+.flex-center {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.hidden {
+    display: none !important;
+}
+
+.fade-in {
+    animation: fadeIn 0.5s ease;
+}

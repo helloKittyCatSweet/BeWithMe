@@ -183,10 +183,10 @@ async def run_finetune():
 # 7. 评估流程
 async def main():
     # A. 评估基础模型 (作为 Baseline)
-    # base_model = KinModel(model="open-mistral-7b")
-    # evaluation = weave.Evaluation(dataset=val_ds[:20], scorers=[kin_scorer])
-    # print("📊 正在评估基础模型...")
-    # await evaluation.evaluate(base_model)
+    base_model = KinModel(model="open-mistral-7b")
+    evaluation = weave.Evaluation(dataset=val_ds[:20], scorers=[kin_scorer])
+    print("📊 正在评估基础模型...")
+    await evaluation.evaluate(base_model)
 
     # B. 执行微调 (这步会持续一段时间)
     await run_finetune()

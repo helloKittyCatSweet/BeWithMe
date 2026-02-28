@@ -83,3 +83,6 @@ htmlcov/
 
 # VSCode Settings
 .vscode
+
+# blockchain
+src/blockchain/node_modules/

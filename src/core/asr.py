@@ -147,6 +147,20 @@ def quick_transcribe(audio_path: str, language: str = "zh") -> str:
     return result["text"] if result else ""
 
 
+def transcribe_audio(audio_path: str, language: str = "zh") -> str:
+    """
+    转录音频文件（简化接口）
+    
+    Args:
+        audio_path: 音频文件路径
+        language: 语言代码 (zh=中文, en=英文)
+    
+    Returns:
+        识别的文本
+    """
+    return quick_transcribe(audio_path, language)
+
+
 def analyze_voice_sample(audio_path: str) -> Dict:
     """
     分析语音样本，提取特征用于创建 PersonalityProfile
