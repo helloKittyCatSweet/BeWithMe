@@ -2,16 +2,20 @@
 聊天相关的 API 路由
 Chat Routes
 """
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
 import logging
 import tempfile
 import os
 from typing import Optional
+from sqlalchemy.orm import Session
 
 from ...core.conversation import ConversationAgent
 from ...core.asr import WhisperASR
 from ...core.voice_cloning import VoiceCloner
 from ..models import ChatRequest, ChatResponse
+from ...database.connection import get_db
+from ...database.crud import conversation as conversation_crud
+from ..auth import get_current_user_optional
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/chat", tags=["chat"])
@@ -163,10 +167,42 @@ async def chat_voice(audio_file: UploadFile = File(...)):
 
 
 @router.get("/history")
-async def get_history():
+async def get_history(
+    user = Depends(get_current_user_optional),
+    db: Session = Depends(get_db)
+):
     """获取对话历史"""
     global current_agent
     
+    # 如果用户已登录，从数据库获取持久化的对话记录
+    if user:
+        conversations = conversation_crud.get_user_conversations(db, user.id, limit=50)
+        history = []
+        for conv in conversations:
+            history.append({
+                "role": "user",
+                "user": conv.user_message,
+                "agent": "",
+                "timestamp": conv.created_at.isoformat() if conv.created_at else None,
+                "blockchain_tx_hash": conv.blockchain_tx_hash,
+                "ipfs_hash": conv.ipfs_hash,
+                "on_chain_timestamp": conv.on_chain_timestamp.isoformat() if conv.on_chain_timestamp else None,
+            })
+            history.append({
+                "role": "agent",
+                "user": "",
+                "agent": conv.agent_response,
+                "timestamp": conv.created_at.isoformat() if conv.created_at else None,
+                "blockchain_tx_hash": conv.blockchain_tx_hash,
+                "ipfs_hash": conv.ipfs_hash,
+                "on_chain_timestamp": conv.on_chain_timestamp.isoformat() if conv.on_chain_timestamp else None,
+            })
+        return {
+            "success": True,
+            "history": history
+        }
+    
+    # 否则，返回内存中的会话历史（向后兼容）
     if not current_agent:
         return {"history": []}
     

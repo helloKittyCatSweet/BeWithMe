@@ -73,8 +73,36 @@ def main():
         except Exception as e:
             print(f"   ❌ Failed to create demo user: {e}")
     
+    # 创建管理员用户
+    print("\n4️⃣ Create admin user")
+    create_admin = input("   Create an admin user? (yes/no): ").strip().lower()
+    
+    if create_admin == "yes":
+        try:
+            with get_db_session() as db:
+                from src.database import get_user_by_email
+                existing_admin = get_user_by_email(db, "admin@bewithme.ai")
+                
+                if existing_admin:
+                    print("   ℹ️  Admin user already exists")
+                else:
+                    admin_user = create_user(
+                        db=db,
+                        username="admin",
+                        email="admin@bewithme.ai",
+                        password="admin123",
+                        full_name="System Administrator",
+                        phone=None,
+                        is_admin=True
+                    )
+                    print(f"   ✅ Admin user created: ID={admin_user.id}, username={admin_user.username}")
+                    print(f"   📝 Login credentials: admin@bewithme.ai / admin123")
+                    print(f"   🔐 Admin privileges: ENABLED")
+        except Exception as e:
+            print(f"   ❌ Failed to create admin user: {e}")
+    
     # 显示数据库统计
-    print("\n4️⃣ Database Statistics")
+    print("\n5️⃣ Database Statistics")
     try:
         with get_db_session() as db:
             from src.database import get_system_stats

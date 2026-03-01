@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 import logging
 
 from .routes import voice, conversation, chat, relationships
+from .routes import auth
 from .models import SystemStatus
 from ..config import API_HOST, API_PORT
 from ..database import init_db, test_connection, get_system_stats, get_db_session
@@ -60,6 +61,9 @@ app.include_router(voice.router)
 app.include_router(conversation.router)
 app.include_router(chat.router)
 app.include_router(relationships.router, prefix="/relationships", tags=["relationships"])
+app.include_router(auth.router)
+
+# 注意：区块链功能由前端直接通过 ethers.js/web3.js 调用智能合约
 
 
 # ============ 系统端点 ============

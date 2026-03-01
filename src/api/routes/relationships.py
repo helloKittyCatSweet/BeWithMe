@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from datetime import datetime
 import os
 import shutil
+import json
 
 from ...database import (
     get_db,
@@ -21,8 +22,12 @@ from ...database import (
     get_pending_verifications,
     RelationshipType,
     VerificationStatus,
-    log_action
+    log_action,
+    create_verification_document,
+    get_documents_by_relationship,
+    delete_document,
 )
+from ..auth import get_current_admin
 
 router = APIRouter()
 
@@ -150,6 +155,211 @@ async def upload_verification_document(
         raise HTTPException(status_code=500, detail=f"文件上传失败: {str(e)}")
 
 
+@router.post("/{relationship_id}/upload-documents")
+async def upload_multiple_verification_documents(
+    relationship_id: int,
+    user_id: int,  # 实际应用中从 JWT token 获取
+    documents: List[UploadFile] = File(...),
+    document_types: Optional[str] = Form(None),  # JSON string of document types
+    descriptions: Optional[str] = Form(None),  # JSON string of descriptions
+    db: Session = Depends(get_db)
+):
+    """
+    上传多个验证文件
+    
+    支持一次上传多个文件（如户口本、死亡证明、身份证等）
+    """
+    # 获取关系记录
+    relationship_record = get_relationship_by_id(db, relationship_id)
+    
+    if not relationship_record:
+        raise HTTPException(status_code=404, detail="关系记录不存在")
+    
+    # 验证用户权限
+    if relationship_record.user_id != user_id:
+        log_action(db, user_id, "unauthorized_document_upload", "Relationship", 
+                   relationship_id, success=False, error_message="User mismatch")
+        raise HTTPException(status_code=403, detail="无权上传此关系的文件")
+    
+    # 创建上传目录
+    upload_dir = "data/verification_documents"
+    os.makedirs(upload_dir, exist_ok=True)
+    
+    # 解析文档类型和描述（如果提供）
+    doc_types_list = []
+    descriptions_list = []
+    
+    if document_types:
+        try:
+            doc_types_list = json.loads(document_types)
+        except:
+            doc_types_list = []
+    
+    if descriptions:
+        try:
+            descriptions_list = json.loads(descriptions)
+        except:
+            descriptions_list = []
+    
+    uploaded_files = []
+    failed_files = []
+    
+    for idx, document in enumerate(documents):
+        try:
+            # 验证文件大小（最大 10MB）
+            content = await document.read()
+            file_size = len(content)
+            
+            if file_size > 10 * 1024 * 1024:  # 10MB
+                failed_files.append({
+                    "filename": document.filename,
+                    "error": "文件大小超过 10MB 限制"
+                })
+                continue
+            
+            # 保存文件
+            file_extension = os.path.splitext(document.filename)[1]
+            timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+            file_path = os.path.join(
+                upload_dir, 
+                f"rel_{relationship_id}_{timestamp}_{idx}{file_extension}"
+            )
+            
+            with open(file_path, "wb") as buffer:
+                buffer.write(content)
+            
+            # 获取文档类型和描述
+            doc_type = doc_types_list[idx] if idx < len(doc_types_list) else None
+            description = descriptions_list[idx] if idx < len(descriptions_list) else None
+            
+            # 创建数据库记录
+            doc_record = create_verification_document(
+                db=db,
+                relationship_id=relationship_id,
+                user_id=user_id,
+                filename=document.filename,
+                file_path=file_path,
+                file_size=file_size,
+                file_type=document.content_type or "application/octet-stream",
+                document_type=doc_type,
+                description=description
+            )
+            
+            uploaded_files.append({
+                "id": doc_record.id,
+                "filename": document.filename,
+                "file_path": file_path,
+                "file_size": file_size,
+                "document_type": doc_type
+            })
+            
+            # 重置文件指针
+            await document.seek(0)
+            
+        except Exception as e:
+            failed_files.append({
+                "filename": document.filename,
+                "error": str(e)
+            })
+    
+    # 记录审计日志
+    log_action(
+        db, user_id, "multiple_documents_uploaded", "Relationship", 
+        relationship_id,
+        details=f"Uploaded {len(uploaded_files)} files, {len(failed_files)} failed"
+    )
+    
+    return {
+        "status": "success" if uploaded_files else "partial_success",
+        "relationship_id": relationship_id,
+        "uploaded_count": len(uploaded_files),
+        "failed_count": len(failed_files),
+        "uploaded_files": uploaded_files,
+        "failed_files": failed_files,
+        "message": f"成功上传 {len(uploaded_files)} 个文件" + (f"，{len(failed_files)} 个失败" if failed_files else "")
+    }
+
+
+@router.get("/{relationship_id}/documents")
+async def get_relationship_documents(
+    relationship_id: int,
+    user_id: int,  # 实际应用中从 JWT token 获取
+    db: Session = Depends(get_db)
+):
+    """获取某个关系的所有验证文档"""
+    # 获取关系记录
+    relationship_record = get_relationship_by_id(db, relationship_id)
+    
+    if not relationship_record:
+        raise HTTPException(status_code=404, detail="关系记录不存在")
+    
+    # 验证用户权限
+    if relationship_record.user_id != user_id:
+        raise HTTPException(status_code=403, detail="无权查看此关系的文件")
+    
+    # 获取文档列表
+    documents = get_documents_by_relationship(db, relationship_id)
+    
+    return {
+        "relationship_id": relationship_id,
+        "document_count": len(documents),
+        "documents": [
+            {
+                "id": doc.id,
+                "filename": doc.filename,
+                "file_size": doc.file_size,
+                "file_type": doc.file_type,
+                "document_type": doc.document_type,
+                "description": doc.description,
+                "uploaded_at": doc.uploaded_at.isoformat() if doc.uploaded_at else None
+            }
+            for doc in documents
+        ]
+    }
+
+
+@router.delete("/{relationship_id}/documents/{document_id}")
+async def delete_verification_document(
+    relationship_id: int,
+    document_id: int,
+    user_id: int,  # 实际应用中从 JWT token 获取
+    db: Session = Depends(get_db)
+):
+    """删除验证文档"""
+    from ...database.crud.verification_document import get_document_by_id
+    
+    # 获取文档记录
+    doc = get_document_by_id(db, document_id)
+    
+    if not doc:
+        raise HTTPException(status_code=404, detail="文档不存在")
+    
+    # 验证文档属于指定关系
+    if doc.relationship_id != relationship_id:
+        raise HTTPException(status_code=400, detail="文档不属于该关系")
+    
+    # 验证用户权限
+    if doc.user_id != user_id:
+        raise HTTPException(status_code=403, detail="无权删除此文档")
+    
+    # 删除物理文件
+    try:
+        if os.path.exists(doc.file_path):
+            os.remove(doc.file_path)
+    except Exception as e:
+        log_action(db, user_id, "document_file_delete_failed", "VerificationDocument",
+                   document_id, success=False, error_message=str(e))
+    
+    # 删除数据库记录
+    success = delete_document(db, document_id)
+    
+    if success:
+        log_action(db, user_id, "document_deleted", "VerificationDocument", document_id)
+        return {"status": "success", "message": "文档已删除"}
+    else:
+        raise HTTPException(status_code=500, detail="删除失败")
+
+
 @router.get("/list", response_model=List[RelationshipResponse])
 async def list_user_relationships(
     user_id: int,  # 实际应用中从 JWT token 获取
@@ -220,7 +430,8 @@ async def check_relationship_status(
 async def verify_relationship(
     relationship_id: int,
     action: VerificationAction,
-    reviewer_id: int,  # 实际应用中从 JWT token 获取并验证管理员权限
+    reviewer_id: int,
+    admin_user=Depends(get_current_admin),
     db: Session = Depends(get_db)
 ):
     """
@@ -234,9 +445,8 @@ async def verify_relationship(
     if not relationship:
         raise HTTPException(status_code=404, detail="关系记录不存在")
     
-    # TODO: 验证 reviewer_id 是否为管理员
-    # if not is_admin(reviewer_id):
-    #     raise HTTPException(status_code=403, detail="需要管理员权限")
+    if admin_user.id != reviewer_id:
+        raise HTTPException(status_code=403, detail="reviewer_id mismatch")
     
     try:
         if action.action == "approve":
@@ -273,7 +483,8 @@ async def verify_relationship(
 
 @router.get("/admin/pending", response_model=List[RelationshipResponse])
 async def get_pending_relationships(
-    reviewer_id: int,  # 实际应用中从 JWT token 获取并验证管理员权限
+    reviewer_id: int,
+    admin_user=Depends(get_current_admin),
     db: Session = Depends(get_db)
 ):
     """
@@ -281,9 +492,8 @@ async def get_pending_relationships(
     
     返回所有状态为 pending 的关系申请
     """
-    # TODO: 验证 reviewer_id 是否为管理员
-    # if not is_admin(reviewer_id):
-    #     raise HTTPException(status_code=403, detail="需要管理员权限")
+    if admin_user.id != reviewer_id:
+        raise HTTPException(status_code=403, detail="reviewer_id mismatch")
     
     pending = get_pending_verifications(db)
     return pending
@@ -328,3 +538,6 @@ async def delete_relationship(
         "status": "success",
         "message": "关系记录已删除"
     }
+
+
+# 注意：区块链保存功能已移至前端，前端直接调用智能合约

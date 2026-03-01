@@ -55,6 +55,33 @@ export const healthCheck = async (): Promise<{ status: string; timestamp: string
   return data;
 };
 
+export const loginWithEmail = async (
+  email: string,
+  password: string
+): Promise<{
+  success: boolean;
+  access_token: string;
+  token_type: string;
+  user: { id: number; username: string; email: string; is_admin: boolean };
+}> => {
+  const { data } = await apiClient.post('/auth/login', { email, password });
+  return data;
+};
+
+export const registerUser = async (
+  username: string,
+  email: string,
+  password: string
+): Promise<{
+  success: boolean;
+  access_token: string;
+  token_type: string;
+  user: { id: number; username: string; email: string; is_admin: boolean };
+}> => {
+  const { data } = await apiClient.post('/auth/register', { username, email, password });
+  return data;
+};
+
 // ============ Relationship APIs ============
 
 export const registerRelationship = async (
@@ -91,6 +118,109 @@ export const uploadVerificationDocument = async (
       params: { user_id: userId },
       headers: { 'Content-Type': 'multipart/form-data' }
     }
+  );
+  return data;
+};
+
+export const uploadMultipleVerificationDocuments = async (
+  relationshipId: number,
+  userId: number,
+  documents: File[],
+  documentTypes?: string[],
+  descriptions?: string[]
+): Promise<{
+  status: string;
+  uploaded_count: number;
+  failed_count: number;
+  uploaded_files: any[];
+  failed_files: any[];
+  message: string;
+}> => {
+  const formData = new FormData();
+  
+  // 添加所有文件
+  documents.forEach(doc => {
+    formData.append('documents', doc);
+  });
+  
+  // 添加文档类型（如果提供）
+  if (documentTypes && documentTypes.length > 0) {
+    formData.append('document_types', JSON.stringify(documentTypes));
+  }
+  
+  // 添加描述（如果提供）
+  if (descriptions && descriptions.length > 0) {
+    formData.append('descriptions', JSON.stringify(descriptions));
+  }
+
+  const { data } = await apiClient.post(
+    `/relationships/${relationshipId}/upload-documents`,
+    formData,
+    {
+      params: { user_id: userId },
+      headers: { 'Content-Type': 'multipart/form-data' }
+    }
+  );
+  return data;
+};
+
+export const getRelationshipDocuments = async (
+  relationshipId: number,
+  userId: number
+): Promise<{
+  relationship_id: number;
+  document_count: number;
+  documents: Array<{
+    id: number;
+    filename: string;
+    file_size: number;
+    file_type: string;
+    document_type?: string;
+    description?: string;
+    uploaded_at?: string;
+  }>;
+}> => {
+  const { data } = await apiClient.get(
+    `/relationships/${relationshipId}/documents`,
+    {
+      params: { user_id: userId }
+    }
+  );
+  return data;
+};
+
+export const deleteVerificationDocument = async (
+  relationshipId: number,
+  documentId: number,
+  userId: number
+): Promise<{ status: string; message: string }> => {
+  const { data } = await apiClient.delete(
+    `/relationships/${relationshipId}/documents/${documentId}`,
+    {
+      params: { user_id: userId }
+    }
+  );
+  return data;
+};
+
+export const getPendingRelationships = async (
+  reviewerId: number
+): Promise<RelationshipData[]> => {
+  const { data } = await apiClient.get('/relationships/admin/pending', {
+    params: { reviewer_id: reviewerId }
+  });
+  return data;
+};
+
+export const verifyRelationshipByAdmin = async (
+  relationshipId: number,
+  payload: { action: 'approve' | 'reject'; reviewer: string; notes?: string },
+  reviewerId: number
+): Promise<RelationshipData> => {
+  const { data } = await apiClient.post(
+    `/relationships/${relationshipId}/verify`,
+    payload,
+    { params: { reviewer_id: reviewerId } }
   );
   return data;
 };
@@ -151,12 +281,16 @@ export const quickTTS = async (
 export const createAgent = async (
   profile: AgentProfile
 ): Promise<{ success: boolean; message: string; agent_name: string }> => {
-  const { data } = await apiClient.post('/conversation/create-agent', profile);
-  return data;
+  const { data } = await apiClient.post('/agent/create', profile);
+  return {
+    success: !!data.success,
+    message: data.message,
+    agent_name: data.agent_name || data.profile?.name || profile.name,
+  };
 };
 
 export const resetAgent = async (): Promise<{ success: boolean; message: string }> => {
-  const { data } = await apiClient.post('/conversation/reset-agent');
+  const { data } = await apiClient.post('/agent/reset');
   return data;
 };
 
@@ -189,7 +323,7 @@ export const sendVoiceMessage = async (
 export const simulateCall = async (
   audioFile: File,
   voiceId: string,
-  agentName: string = '亲人'
+  agentName: string = 'Loved One'
 ): Promise<{ audio: Blob; userMessage: string; aiResponse: string }> => {
   const formData = new FormData();
   formData.append('audio_file', audioFile);
@@ -214,6 +348,57 @@ export const getChatHistory = async (): Promise<{ history: ChatMessage[] }> => {
 };
 
 export const clearChatHistory = async (): Promise<{ message: string }> => {
-  const { data } = await apiClient.post('/chat/clear-history');
+  const { data } = await apiClient.post('/chat/clear');
+  return data;
+};
+// ============ Blockchain APIs ============
+
+export const saveVoiceToBlockchain = async (
+  voiceId: string,
+  voiceName: string,
+  ipfsHash: string,
+  userAddress: string
+): Promise<{ success: boolean; tx_hash?: string; error?: string }> => {
+  const { data } = await apiClient.post('/voice/save-to-blockchain', {
+    voice_id: voiceId,
+    voice_name: voiceName,
+    ipfs_hash: ipfsHash,
+    user_address: userAddress
+  });
+  return data;
+};
+
+export const saveRelationshipToBlockchain = async (
+  relationshipId: number,
+  ipfsHash: string,
+  userAddress: string
+): Promise<{ success: boolean; tx_hash?: string; error?: string }> => {
+  const { data } = await apiClient.post('/relationships/save-to-blockchain', {
+    relationship_id: relationshipId,
+    ipfs_hash: ipfsHash,
+    user_address: userAddress
+  });
+  return data;
+};
+
+export const saveAgentToBlockchain = async (
+  payload: {
+    agent_name: string;
+    ipfs_hash: string;
+    wallet_address: string;
+    agent_data?: any;
+  }
+): Promise<{ success: boolean; tx_hash?: string; error?: string }> => {
+  const { data } = await apiClient.post('/agent/save-agent-to-blockchain', payload);
+  return data;
+};
+
+export const getUserBlockchainMemories = async (
+  userAddress: string,
+  userId: number
+): Promise<{ memories: any[]; count: number }> => {
+  const { data } = await apiClient.get(`/blockchain/memories/${userAddress}`, {
+    params: { user_id: userId }
+  });
   return data;
 };

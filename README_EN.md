@@ -1,30 +1,43 @@
-# 🎙️ Be With Me - AI Voice Companion
+# 🎙️ BeWithMe - AI Emotional Companion & Memory Persistence System
 
-**AI-Powered Voice Cloning & Conversation System**
+**AI-Powered Voice Cloning, Personality Adaptation, and Blockchain Persistence**
 
-Create meaningful conversations with AI that sounds and talks like your loved ones. Built for [NVIDIA Mistral Worldwide Hackathon 2026](https://worldwide-hackathon.mistral.ai/).
+Stand out in the [NVIDIA Mistral Worldwide Hackathon 2026](https://worldwide-hackathon.mistral.ai/). BeWithMe is dedicated to creating meaningful conversations with loved ones through cutting-edge AI, while leveraging blockchain technology to ensure the eternity and ownership of these precious memories.
 
-## 🏆 Hackathon Tracks
+---
 
-This project supports **multiple tracks**:
+## 🏆 Hackathon Tracks Support
 
-- ✅ **W&B Fine-Tuning Track** - Fine-tune Mistral models for personality adaptation
-- ✅ **Mistral Agents Track** - Conversational AI with personality injection  
-- ✅ **General Track** - Voice cloning + LLM conversation system
+This project provides full coverage and deep integration for the following tracks:
 
-## ✨ Features
+- ✅ **W&B Fine-Tuning Track** - Fine-tune Mistral models for personality adaptation with full E2E tracking via W&B.
+- ✅ **Mistral Agents Track** - Build conversational agents with specific persona traits and speech patterns.
+- ✅ **General Track** - A complete voice-to-voice interaction system combining ASR, LLM, and Voice Cloning.
+- 🚀 **Web3 Extension** - Innovative use of blockchain to solve the ultimate human quest: "Eternal digital existence and ownership of emotional assets."
 
-### Core Capabilities
-- 🎤 **Voice Cloning** - 30-second instant voice cloning via ElevenLabs
-- 🤖 **Personality Modeling** - Create AI agents with specific traits and speech patterns
-- 💬 **Natural Conversations** - Powered by Mistral Large 2
-- 🎧 **Speech Recognition** - OpenAI Whisper for voice input
+---
 
-### Advanced Features
-- 📊 **W&B Weave Integration** - Trace every conversation for debugging
-- 🔧 **Fine-Tuning Support** - Train models to inherently learn personalities
-- 🛡️ **Safety Check Interface** - Ready for NeMo Guardrails integration
-- 📈 **Experiment Tracking** - Full W&B Models integration
+## ✨ Key Features
+
+### 🧠 Core Capabilities
+- 🎤 **Instant Voice Cloning** - Achieve high-fidelity voice reproduction with just 30 seconds of audio via ElevenLabs.
+- 🤖 **Personality Modeling** - Capture the essence of a loved one's personality, catchphrases, and emotional nuances.
+- 💬 **Empathetic Conversations** - Powered by **Mistral Large 2**, providing logical yet deeply compassionate interactions.
+- 🎧 **Voice Interaction (ASR)** - Seamless speech-to-text integration using OpenAI Whisper.
+
+### 📊 Deep W&B Integration (Fine-Tuning & Eval)
+- **Weave Tracing**: Monitor every conversation trace to optimize prompts and model responses.
+- **Experiment Comparison**: Visual comparison of performance across model versions to ensure fine-tuning quality.
+- **Artifact Management**: Automated handling of datasets, LoRA weights, and evaluation reports.
+
+![W&B Model Comparison](docs/w&b_comparasion.png)
+
+### ⛓️ Blockchain Persistence (MemoryLock)
+- **Decentralized Storage**: Use IPFS/Arweave hashes for raw materials to ensure memories survive beyond any single service provider.
+- **Digital Ownership (NFT/SFT)**: Encapsulate model weights as assets, where only specific private key holders (family) can "awaken" the AI.
+- **Smart Contract Triggers**: Implement "Digital Wills" that release messages or assets upon specific emotional verification or time triggers.
+
+---
 
 ## 🚀 Quick Start
 
@@ -37,184 +50,82 @@ python --version
 pip install uv
 ```
 
-### Installation
-
+### Installation & Configuration
+1. **Clone & Install**
 ```bash
-# Clone repository
+git clone https://github.com/your-repo/BeWithMe.git
 cd BeWithMe
-
-# Create virtual environment
 uv venv
-
-# Install dependencies
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+source .venv/bin/activate
 uv pip install -r requirements.txt
 ```
 
-### Configuration
-
-```bash
-# Copy environment template
-cp .env.example .env
-
-# Add your API keys
-MISTRAL_API_KEY=your_mistral_api_key
-ELEVENLABS_API_KEY=your_elevenlabs_api_key
-WANDB_API_KEY=your_wandb_api_key  # Optional but recommended
+2. **Environment Setup**
+Copy `.env.example` to `.env` and fill in your API keys:
+```env
+MISTRAL_API_KEY=your_key
+ELEVENLABS_API_KEY=your_key
+WANDB_API_KEY=your_key
 ```
 
-### Run the Application
-
-**Option 1: One-command launch** (Recommended)
+### Run the App
+**Recommended: One-command launch**
 ```bash
+chmod +x scripts/run_all.sh
 ./scripts/run_all.sh
 ```
+Access points:
+- 🎨 **Frontend UI**: `http://localhost:8501`
+- 🔧 **API Docs**: `http://localhost:8000/docs`
 
-**Option 2: Separate terminals**
-```bash
-# Terminal 1: Backend
-./scripts/run_backend.sh
+---
 
-# Terminal 2: Frontend
-./scripts/run_frontend.sh
-```
+## 🎯 W&B Fine-Tuning Workflow
 
-Then visit:
-- 🎨 **Frontend**: http://localhost:8501
-- 🔧 **API Docs**: http://localhost:8000/docs
-
-## 📖 Documentation
-
-- [🏗️ Architecture Guide](docs/ARCHITECTURE.md)
-- [⚡ Quick Start Guide](QUICKSTART.md)
-- [🎯 Fine-Tuning Guide](docs/FINETUNING_GUIDE.md) - **New!**
-- [🎭 Demo Guide](docs/DEMO_GUIDE.md)
-- [📁 Project Structure](docs/PROJECT_STRUCTURE.md)
-
-## 🎯 W&B Fine-Tuning Track
-
-Want to compete in the Fine-Tuning track? We've got you covered!
-
-### Why Fine-Tune?
-
-Instead of using system prompts, fine-tune Mistral to **inherently understand** personalities:
-- Better consistency
-- More authentic responses  
-- Computational efficiency
-- Task specialization
-
-### Fine-Tuning Workflow
+We provide a complete pipeline to train models with "soul."
 
 ```bash
-# 1. Prepare training data from conversations
+# 1. Prepare training data
 python -m src.training.data_preparation
 
-# 2. Start fine-tuning job (tracked in W&B)
+# 2. Start Mistral Fine-Tuning (Tracked in W&B)
 python -m src.training.mistral_finetuner
 
-# 3. Monitor progress in W&B dashboard
-# 4. Evaluate with Weave
-
-# Or run the complete pipeline:
-./scripts/finetune_workflow.sh
+# 3. Run Evaluation and view Weave traces
+./scripts/evaluate_model.sh
 ```
 
-**Key Features:**
-- ✅ Automatic W&B Models tracking
-- ✅ Weave evaluation integration
-- ✅ Artifact logging (LoRA adapters)
-- ✅ Training curves visualization
-- ✅ E2E pipeline (Data → Train → Eval)
+**Why Fine-Tune?**
+Fine-tuning allows the model to inherently learn specific speech patterns and emotional feedback loops, resulting in responses that feel significantly more authentic than those generated by system prompts alone.
 
-See [Fine-Tuning Guide](docs/FINETUNING_GUIDE.md) for details.
+---
 
-## 🛠️ Tech Stack
-
-| Component | Technology |
-|-----------|-----------|
-| **LLM** | Mistral Large 2 (via Mistral AI API) |
-| **Voice Cloning** | ElevenLabs Instant Voice Cloning |
-| **Speech Recognition** | OpenAI Whisper (base model) |
-| **Backend** | FastAPI + Uvicorn |
-| **Frontend** | Streamlit |
-| **Tracking** | W&B Weave + W&B Models |
-| **Package Manager** | uv |
-
-## 📁 Project Structure
+## 🏗️ Project Structure
 
 ```
 BeWithMe/
 ├── src/
-│   ├── config.py              # Centralized configuration
-│   ├── core/                  # Business logic
-│   │   ├── voice_cloning.py  # ElevenLabs integration
-│   │   ├── conversation.py   # Mistral + personality
-│   │   └── asr.py            # Whisper ASR
-│   ├── api/                   # FastAPI backend
-│   │   ├── main.py           # App entry point
-│   │   ├── models.py         # Pydantic models
-│   │   └── routes/           # Modular routes
-│   ├── frontend/              # Streamlit UI
-│   │   └── app.py
-│   └── training/              # Fine-tuning (NEW!)
-│       ├── data_preparation.py
-│       └── mistral_finetuner.py
-├── scripts/                   # Launch scripts
-├── docs/                      # Documentation
-└── tests/                     # Test suite
+│   ├── core/           # Business logic (ASR, Voice Cloning, Conversation)
+│   ├── api/            # FastAPI backend & data models
+│   ├── frontend/       # Streamlit UI
+│   └── training/       # W&B Fine-tuning & data prep scripts
+├── blockchain/         # Smart contracts & deployment (Solidity)
+├── scripts/            # Automation scripts
+├── docs/               # Detailed documentation & assets
+└── tests/              # Test suite
 ```
-
-## 🎨 Screenshots
-
-### Main Interface
-- **Step 1**: Clone voice from audio sample
-- **Step 2**: Create personality profile
-- **Step 3**: Start conversation
-- **Step 4**: View history & analytics
-
-## 📊 W&B Integration
-
-### Weave Tracing
-Every conversation is traced:
-```python
-import weave
-weave.init("be-with-me")
-
-# All Mistral calls automatically traced!
-response = agent.generate_response(user_message)
-```
-
-### Models Tracking
-Fine-tuning experiments logged:
-```python
-import wandb
-wandb.init(project="be-with-me-finetuning")
-
-# Training curves, metrics, artifacts
-wandb.log({"loss": 0.42, "accuracy": 0.87})
-```
-
-## 🤝 Contributing
-
-This is a hackathon project, but contributions are welcome!
-
-## 📜 License
-
-MIT License - See [LICENSE](LICENSE) for details
-
-## 🙏 Acknowledgments
-
-- **Mistral AI** for the amazing LLMs
-- **ElevenLabs** for voice cloning technology
-- **Weights & Biases** for ML tooling and hackathon support
-- **NVIDIA** for hackathon organization
-
-## 📞 Contact
-
-Built for **NVIDIA Mistral Worldwide Hackathon Singapore** (Feb 28 - March 1, 2026)
 
 ---
 
-⭐ **Star this repo** if you find it helpful!
+## 📜 License
+This project is licensed under the MIT License. Please adhere to ethical guidelines and legal regulations when using voice cloning technology.
 
-🏆 **Hackathon Judges**: See [DEMO_GUIDE.md](docs/DEMO_GUIDE.md) for evaluation walkthrough
+---
+
+## 🙏 Acknowledgments
+- **Mistral AI** for state-of-the-art LLMs.
+- **Weights & Biases** for best-in-class experiment tracking and evaluation tools.
+- **NVIDIA** for organizing this worldwide hackathon.
+
+---
+🏆 **Hackathon Judges**: See [DEMO_GUIDE.md](docs/DEMO_GUIDE.md) for the evaluation walkthrough.

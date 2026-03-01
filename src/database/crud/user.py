@@ -16,7 +16,8 @@ def create_user(
     email: str,
     password: str,
     full_name: str,
-    phone: Optional[str] = None
+    phone: Optional[str] = None,
+    is_admin: bool = False
 ) -> User:
     """创建新用户"""
     # 密码哈希（实际应用中使用 bcrypt/argon2）
@@ -27,7 +28,8 @@ def create_user(
         email=email,
         password_hash=password_hash,
         full_name=full_name,
-        phone=phone
+        phone=phone,
+        is_admin=is_admin
     )
     
     db.add(user)

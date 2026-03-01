@@ -1,6 +1,6 @@
 export function formatDate(dateStr: string): string {
   const date = new Date(dateStr);
-  return date.toLocaleDateString('zh-CN', {
+  return date.toLocaleDateString('en-US', {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit'
@@ -9,7 +9,7 @@ export function formatDate(dateStr: string): string {
 
 export function formatDateTime(dateStr: string): string {
   const date = new Date(dateStr);
-  return date.toLocaleString('zh-CN', {
+  return date.toLocaleString('en-US', {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -28,21 +28,21 @@ export function formatFileSize(bytes: number): string {
 
 export function getRelationshipLabel(type: string): string {
   const map: Record<string, string> = {
-    parent: '父母',
-    grandparent: '祖父母/外祖父母',
-    sibling: '兄弟姐妹',
-    child: '子女',
-    spouse: '配偶',
-    other: '其他'
+    parent: 'Parent',
+    grandparent: 'Grandparent',
+    sibling: 'Sibling',
+    child: 'Child',
+    spouse: 'Spouse',
+    other: 'Other'
   };
   return map[type] || type;
 }
 
 export function getStatusLabel(status: string): string {
   const map: Record<string, string> = {
-    pending: '审核中',
-    approved: '已通过',
-    rejected: '已拒绝'
+    pending: 'Pending',
+    approved: 'Approved',
+    rejected: 'Rejected'
   };
   return map[status] || status;
 }

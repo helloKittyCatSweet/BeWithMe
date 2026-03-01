@@ -2,12 +2,21 @@
 对话相关的 API 路由
 Conversation Routes
 """
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
+from sqlalchemy.orm import Session
 import logging
 from typing import Optional
+from pydantic import BaseModel
 
 from ...core.conversation import ConversationAgent, create_custom_agent
 from ..models import ProfileRequest, CreateAgentResponse, ChatRequest, ChatResponse
+from ...database import (
+    get_db, 
+    log_action, 
+    get_agent_profile,
+    get_user_agent_profiles
+)
+from ..auth import get_current_user
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/agent", tags=["agent"])
@@ -80,3 +89,6 @@ async def get_current_agent():
         "personality": current_agent.profile.personality_traits,
         "speech_patterns": current_agent.profile.speech_patterns
     }
+
+
+# 注意：区块链保存功能已移至前端，前端直接调用智能合约

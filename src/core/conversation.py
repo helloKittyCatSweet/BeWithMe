@@ -2,8 +2,18 @@
 模块 B: 语气注入与对话生成 (Mistral API)
 Module B: Conversation Generation with Personality Injection (Mistral)
 """
-from mistralai.client import MistralClient
-from mistralai.models.chat_completion import ChatMessage
+try:
+    from mistralai.client import MistralClient
+    from mistralai.models.chat_completion import ChatMessage
+except ImportError:
+    # Fallback for different mistralai versions
+    try:
+        from mistralai import MistralClient
+        ChatMessage = None  # Will use dict format
+    except ImportError:
+        MistralClient = None
+        ChatMessage = None
+
 from ..config import MISTRAL_API_KEY, MISTRAL_MODEL, TEMPERATURE, MAX_TOKENS, WANDB_PROJECT
 import logging
 from typing import Generator, List, Dict, Optional
@@ -97,21 +107,30 @@ class ConversationAgent:
         """
         try:
             # 构建消息历史
-            messages = [
-                ChatMessage(role="system", content=self.profile.generate_system_prompt())
-            ]
+            system_msg = self.profile.generate_system_prompt()
+            
+            if ChatMessage:
+                messages = [ChatMessage(role="system", content=system_msg)]
+            else:
+                messages = [{"role": "system", "content": system_msg}]
             
             # 添加历史对话（保留最近5轮）
             for msg in self.conversation_history[-10:]:
-                messages.append(ChatMessage(
-                    role=msg["role"], 
-                    content=msg["content"]
-                ))
+                if ChatMessage:
+                    messages.append(ChatMessage(
+                        role=msg["role"], 
+                        content=msg["content"]
+                    ))
+                else:
+                    messages.append(msg)
             
             # 添加当前用户输入
-            messages.append(ChatMessage(role="user", content=user_input))
+            if ChatMessage:
+                messages.append(ChatMessage(role="user", content=user_input))
+            else:
+                messages.append({"role": "user", "content": user_input})
             
-            # 调用 Mistral API
+            # 调用 Mistral API（优先使用 open-* 模型）
             if stream:
                 response_text = ""
                 for chunk in self.client.chat_stream(

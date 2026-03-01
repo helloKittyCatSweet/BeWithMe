@@ -51,6 +51,8 @@ class CloneVoiceResponse(BaseModel):
     voice_name: str
     message: str
     analysis: Optional[dict] = None
+    ipfs_hash: Optional[str] = None
+    ipfs_gateway_url: Optional[str] = None
 
 
 class CreateAgentResponse(BaseModel):

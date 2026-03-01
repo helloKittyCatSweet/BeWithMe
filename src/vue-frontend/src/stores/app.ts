@@ -17,6 +17,17 @@ export const useAppStore = defineStore('app', () => {
   const loading = ref(false);
   const error = ref<string | null>(null);
   const currentStep = ref(0); // 0: verification, 1: voice, 2: agent, 3: chat
+  
+  // Auth State
+  const isLoggedIn = ref(false);
+  const walletAddress = ref<string | null>(null);
+  const isAdmin = ref(false);
+
+  function setWalletAddress(addr: string) {
+    walletAddress.value = addr;
+    isLoggedIn.value = true;
+  }
+
 
   // Computed
   const isSystemReady = computed(() => 
@@ -117,6 +128,20 @@ export const useAppStore = defineStore('app', () => {
     currentStep.value = step;
   }
 
+  function setCurrentUserId(userId: number) {
+    currentUserId.value = userId;
+  }
+
+  function setLoggedIn(status: boolean, address?: string, admin: boolean = false) {
+    isLoggedIn.value = status;
+    if (address) walletAddress.value = address;
+    isAdmin.value = admin;
+  }
+
+  function setAdmin(status: boolean) {
+    isAdmin.value = status;
+  }
+
   function reset() {
     voiceCloned.value = false;
     voiceId.value = null;
@@ -125,6 +150,7 @@ export const useAppStore = defineStore('app', () => {
     agentName.value = null;
     chatHistory.value = [];
     currentStep.value = 0;
+    isAdmin.value = false;
   }
 
   return {
@@ -141,6 +167,9 @@ export const useAppStore = defineStore('app', () => {
     loading,
     error,
     currentStep,
+    isLoggedIn,
+    walletAddress,
+    isAdmin,
     // Computed
     isSystemReady,
     setupProgress,
@@ -150,12 +179,16 @@ export const useAppStore = defineStore('app', () => {
     fetchSystemStatus,
     setVoiceCloned,
     setAgentCreated,
+    setWalletAddress,
     addChatMessage,
     clearChatHistory,
     setRelationships,
     addRelationship,
     updateRelationship,
     setCurrentStep,
+    setCurrentUserId,
+    setLoggedIn,
+    setAdmin,
     reset
   };
 });

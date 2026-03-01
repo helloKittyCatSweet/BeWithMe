@@ -6,19 +6,25 @@ from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
+from pydantic import BaseModel
 import tempfile
 import os
 import logging
+from datetime import datetime
 
 from ...core.voice_cloning import VoiceCloner
 from ...core.asr import analyze_voice_sample, transcribe_audio
 from ...core.conversation import ConversationAgent
+from ...core.ipfs_service import get_ipfs_service
+from ...config import PINATA_API_KEY, PINATA_SECRET_KEY, IPFS_ENABLED
 from ..models import VoiceInfo, CloneVoiceResponse
 from ...database import (
     get_db, 
     check_relationship_valid, 
     create_voice_profile,
-    log_action
+    log_action,
+    get_user_voice_profiles,
+    get_voice_profile_by_voice_id
 )
 
 logger = logging.getLogger(__name__)
@@ -92,6 +98,41 @@ async def clone_voice(
         import shutil
         shutil.copy(tmp_path, audio_path)
         
+        # 上传到 IPFS (如果启用)
+        ipfs_hash = None
+        ipfs_gateway_url = None
+        ipfs_uploaded_at = None
+        
+        if IPFS_ENABLED and PINATA_API_KEY and PINATA_SECRET_KEY:
+            try:
+                logger.info(f"Uploading audio to IPFS via Pinata...")
+                ipfs_service = get_ipfs_service()
+                
+                # 上传文件到 IPFS
+                result = ipfs_service.upload_file(
+                    file_path=audio_path,
+                    pin_name=f"voice_{voice_name}_{user_id}",
+                    metadata={
+                        "user_id": str(user_id),
+                        "voice_name": voice_name,
+                        "voice_id": voice_id,
+                        "relationship_id": str(relationship_id) if relationship_id else "none",
+                        "upload_time": datetime.utcnow().isoformat()
+                    }
+                )
+                
+                if result and 'IpfsHash' in result:
+                    ipfs_hash = result['IpfsHash']
+                    ipfs_gateway_url = ipfs_service.get_gateway_url(ipfs_hash)
+                    ipfs_uploaded_at = datetime.utcnow()
+                    logger.info(f"✅ Audio uploaded to IPFS: {ipfs_hash}")
+                    logger.info(f"   Gateway URL: {ipfs_gateway_url}")
+                else:
+                    logger.warning("IPFS upload failed, continuing without IPFS hash")
+            except Exception as e:
+                logger.error(f"IPFS upload error: {e}")
+                # 不抛出异常，允许继续执行（IPFS 上传是可选的）
+        
         # 清理临时文件
         if os.path.exists(tmp_path):
             os.unlink(tmp_path)
@@ -108,9 +149,14 @@ async def clone_voice(
                         voice_name=voice_name,
                         description=description,
                         source_audio_path=audio_path,
-                        audio_duration=analysis.get("duration") if analysis else None
+                        audio_duration=analysis.get("duration") if analysis else None,
+                        ipfs_hash=ipfs_hash,
+                        ipfs_gateway_url=ipfs_gateway_url,
+                        ipfs_uploaded_at=ipfs_uploaded_at
                     )
                     logger.info(f"创建音色档案: {voice_profile.id}")
+                    if ipfs_hash:
+                        logger.info(f"   IPFS Hash: {ipfs_hash}")
                 except Exception as e:
                     logger.error(f"创建音色档案失败: {e}")
             
@@ -119,14 +165,16 @@ async def clone_voice(
             chat.current_voice_id = voice_id
             
             log_action(db, user_id, "voice_cloned", "VoiceProfile", None,
-                      details=f"Voice ID: {voice_id}, Name: {voice_name}")
+                      details=f"Voice ID: {voice_id}, Name: {voice_name}, IPFS: {ipfs_hash or 'N/A'}")
             
             return CloneVoiceResponse(
                 success=True,
                 voice_id=voice_id,
                 voice_name=voice_name,
-                message="音色克隆成功！",
-                analysis=analysis
+                message="音色克隆成功！" + (f" (已上传到 IPFS: {ipfs_hash})" if ipfs_hash else ""),
+                analysis=analysis,
+                ipfs_hash=ipfs_hash,
+                ipfs_gateway_url=ipfs_gateway_url
             )
         else:
             log_action(db, user_id, "voice_clone_failed", "VoiceProfile", None,
@@ -319,3 +367,5 @@ async def quick_tts(
         logger.error(f"❌ TTS 失败: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
+# 注意：区块链保存功能已移至前端，前端直接调用智能合约

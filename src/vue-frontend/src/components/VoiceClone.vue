@@ -2,14 +2,14 @@
   <div class="voice-clone">
     <div class="header">
       <h2>🎙️ Step 1: Voice Cloning</h2>
-      <p class="subtitle">上传音频样本来克隆您所爱之人的声音</p>
+      <p class="subtitle">Upload audio samples to clone your loved one's voice.</p>
     </div>
 
     <el-alert
       v-if="!appStore.hasApprovedRelationship"
       type="warning"
-      title="⚠️ 需要先通过家庭关系验证"
-      description="请先在 Step 0 完成家庭关系验证并获得批准，然后刷新页面。"
+      title="⚠️ Family Verification Required"
+      description="Please complete and get approval for the Family Verification step first, then refresh the page."
       :closable="false"
       show-icon
       style="margin-bottom: 20px;"
@@ -21,7 +21,7 @@
         <el-card shadow="hover">
           <template #header>
             <div class="card-header">
-              <span>🎤 克隆新声音</span>
+              <span>🎤 Clone New Voice</span>
             </div>
           </template>
 
@@ -33,10 +33,10 @@
             :disabled="!appStore.hasApprovedRelationship"
             @submit.prevent="submitClone"
           >
-            <el-form-item label="选择关系" prop="relationship_id">
+            <el-form-item label="Relationship" prop="relationship_id">
               <el-select 
                 v-model="cloneForm.relationship_id" 
-                placeholder="选择已验证的关系"
+                placeholder="Select verified relationship"
                 style="width: 100%;"
                 @change="handleRelationshipChange"
               >
@@ -48,29 +48,29 @@
                 />
               </el-select>
               <el-text size="small" type="info" style="margin-top: 5px; display: block;">
-                只能使用已通过验证的关系
+                Only verified relationships can be used.
               </el-text>
             </el-form-item>
 
-            <el-form-item label="声音名称" prop="voice_name">
+            <el-form-item label="Voice Name" prop="voice_name">
               <el-input 
                 v-model="cloneForm.voice_name" 
-                placeholder="例如：爸爸的声音"
+                placeholder="e.g. Dad's Voice"
                 clearable
               />
             </el-form-item>
 
-            <el-form-item label="描述" prop="description">
+            <el-form-item label="Description" prop="description">
               <el-input
                 v-model="cloneForm.description"
                 type="textarea"
                 :rows="3"
-                placeholder="描述这个声音的特点，例如：温暖、低沉、有磁性"
+                placeholder="Describe voice characteristics, e.g. Warm, Deep, Calm"
                 clearable
               />
             </el-form-item>
 
-            <el-form-item label="音频文件" prop="audio_file">
+            <el-form-item label="Audio File" prop="audio_file">
               <el-upload
                 ref="audioUploadRef"
                 class="audio-uploader"
@@ -83,15 +83,15 @@
               >
                 <el-icon class="el-icon--upload"><upload-filled /></el-icon>
                 <div class="el-upload__text">
-                  拖拽文件到这里 或 <em>点击上传</em>
+                  Drop file here or <em>click to upload</em>
                 </div>
                 <template #tip>
                   <div class="el-upload__tip">
-                    <p>📋 <strong>音频要求：</strong></p>
+                    <p>📋 <strong>Audio Requirements:</strong></p>
                     <ul>
-                      <li>格式: WAV, MP3, M4A, FLAC</li>
-                      <li>时长: 10秒 - 5分钟</li>
-                      <li>质量: 清晰、无噪音、单人声</li>
+                      <li>Format: WAV, MP3, M4A, FLAC</li>
+                      <li>Duration: 10s - 5 min</li>
+                      <li>Quality: Clear, no noise, single speaker</li>
                     </ul>
                   </div>
                 </template>
@@ -99,7 +99,7 @@
 
               <!-- Audio Preview -->
               <div v-if="audioPreviewUrl" class="audio-preview">
-                <el-divider content-position="left">音频预览</el-divider>
+                <el-divider content-position="left">Audio Preview</el-divider>
                 <audio :src="audioPreviewUrl" controls style="width: 100%;"></audio>
               </div>
             </el-form-item>
@@ -113,25 +113,25 @@
                 :disabled="!cloneForm.audio_file || !appStore.hasApprovedRelationship"
                 :icon="Microphone"
               >
-                开始克隆声音
+                Start Voice Cloning
               </el-button>
               <el-button 
                 @click="resetForm"
                 :disabled="cloning"
               >
-                重置
+                Reset
               </el-button>
             </el-form-item>
 
             <!-- Progress -->
             <el-collapse-transition>
               <div v-if="cloning" style="margin-top: 20px;">
-                <el-divider>🔄 克隆进度</el-divider>
+                <el-divider>🔄 Cloning Progress</el-divider>
                 <el-steps :active="cloneStep" finish-status="success" align-center>
-                  <el-step title="上传音频" />
-                  <el-step title="分析音频" />
-                  <el-step title="训练模型" />
-                  <el-step title="生成声音" />
+                  <el-step title="Uploading" />
+                  <el-step title="Analyzing" />
+                  <el-step title="Training" />
+                  <el-step title="Generating" />
                 </el-steps>
                 <div style="text-align: center; margin-top: 20px;">
                   <el-text type="info">{{ cloneProgress }}</el-text>
@@ -143,7 +143,7 @@
             <el-alert
               v-if="cloneResult"
               :type="cloneResult.success ? 'success' : 'error'"
-              :title="cloneResult.success ? '✅ 声音克隆成功！' : '❌ 克隆失败'"
+              :title="cloneResult.success ? '✅ Voice Cloned Successfully!' : '❌ Cloning Failed'"
               :closable="false"
               show-icon
               style="margin-top: 20px;"
@@ -153,13 +153,50 @@
                 <p><strong>Voice Name:</strong> {{ cloneResult.voice_name }}</p>
                 <p>{{ cloneResult.message }}</p>
                 
+                <!-- IPFS Information -->
+                <div v-if="cloneResult.ipfs_hash" style="margin-top: 15px; padding: 12px; background: #f0f9ff; border-left: 4px solid #409eff; border-radius: 4px;">
+                  <el-divider content-position="left">
+                    <el-icon style="color: #409eff;"><Link /></el-icon>
+                    IPFS Storage
+                  </el-divider>
+                  <p style="margin: 5px 0;">
+                    <strong>IPFS Hash:</strong> 
+                    <el-tag size="small" type="info" style="margin-left: 8px; font-family: monospace;">
+                      {{ shortenIPFSHash(cloneResult.ipfs_hash) }}
+                    </el-tag>
+                    <el-button 
+                      size="small" 
+                      text
+                      :icon="CopyDocument"
+                      @click="copyIPFSHash(cloneResult.ipfs_hash)"
+                      style="margin-left: 5px;"
+                    >
+                      Copy
+                    </el-button>
+                  </p>
+                  <p style="margin: 5px 0;">
+                    <el-button 
+                      size="small" 
+                      type="primary" 
+                      link
+                      :icon="View"
+                      @click="openIPFSGateway(cloneResult.ipfs_hash)"
+                    >
+                      View on IPFS Gateway
+                    </el-button>
+                  </p>
+                  <el-text size="small" type="info" style="margin-top: 5px; display: block;">
+                    ✅ Your audio is permanently stored on IPFS (Decentralized Storage)
+                  </el-text>
+                </div>
+                
                 <div v-if="cloneResult.analysis" style="margin-top: 10px;">
-                  <el-divider content-position="left">音频分析</el-divider>
+                  <el-divider content-position="left">Audio Analysis</el-divider>
                   <ul>
-                    <li><strong>时长:</strong> {{ cloneResult.analysis.duration?.toFixed(2) }}秒</li>
-                    <li><strong>采样率:</strong> {{ cloneResult.analysis.sample_rate }} Hz</li>
-                    <li><strong>声道数:</strong> {{ cloneResult.analysis.channels }}</li>
-                    <li><strong>质量评分:</strong> {{ cloneResult.analysis.quality_score }}/100</li>
+                    <li><strong>Duration:</strong> {{ cloneResult.analysis.duration?.toFixed(2) }}s</li>
+                    <li><strong>Sample Rate:</strong> {{ cloneResult.analysis.sample_rate }} Hz</li>
+                    <li><strong>Channels:</strong> {{ cloneResult.analysis.channels }}</li>
+                    <li><strong>Quality Score:</strong> {{ cloneResult.analysis.quality_score }}/100</li>
                   </ul>
                 </div>
 
@@ -168,7 +205,18 @@
                   style="margin-top: 15px;"
                   @click="proceedToNextStep"
                 >
-                  继续下一步: 创建对话代理 →
+                  Next Step: Create Digital Agent →
+                </el-button>
+                <el-button 
+                  v-if="appStore.walletAddress && !cloneResult.blockchain_saved"
+                  type="warning"
+                  style="margin-top: 15px; margin-left: 10px;"
+                  @click="saveToBlockchain"
+                  :loading="savingToBlockchain"
+                  :disabled="!cloneResult.voice_id"
+                  icon="DataAnalysis"
+                >
+                  🔗 Save to Blockchain
                 </el-button>
               </div>
               <p v-else>{{ cloneResult.message }}</p>
@@ -183,7 +231,7 @@
         <el-card shadow="hover">
           <template #header>
             <div class="card-header">
-              <span>🎵 已克隆的声音</span>
+              <span>🎵 Cloned Voices</span>
               <el-button 
                 size="small" 
                 text
@@ -191,7 +239,7 @@
                 :loading="loadingVoices"
                 :icon="Refresh"
               >
-                刷新
+                Refresh
               </el-button>
             </div>
           </template>
@@ -219,15 +267,18 @@
                   :loading="testingVoice === voice.voice_id"
                   :icon="VideoPlay"
                 >
-                  测试
+                  Test
                 </el-button>
                 <el-popconfirm
-                  title="确定删除这个声音吗？"
+                  title="Are you sure you want to delete this voice?"
                   @confirm="handleDeleteVoice(voice.voice_id)"
+                  confirm-button-text="Yes"
+                  cancel-button-text="No"
+                  width="200"
                 >
                   <template #reference>
                     <el-button size="small" type="danger" :loading="deletingVoice === voice.voice_id" :icon="Delete">
-                      删除
+                      Delete
                     </el-button>
                   </template>
                 </el-popconfirm>
@@ -235,13 +286,13 @@
             </div>
           </div>
 
-          <el-empty v-else description="还没有克隆任何声音" />
+          <el-empty v-else description="No voices cloned yet" />
         </el-card>
 
         <!-- Test Output -->
         <el-card v-if="testAudioUrl" style="margin-top: 20px;" shadow="hover">
           <template #header>
-            <span>🔊 测试输出</span>
+            <span>🔊 Test Output</span>
           </template>
           <audio :src="testAudioUrl" controls style="width: 100%;"></audio>
         </el-card>
@@ -259,14 +310,18 @@ import {
   Refresh, 
   VideoPlay, 
   Delete,
-  Avatar
+  Avatar,
+  Link,
+  CopyDocument,
+  View
 } from '@element-plus/icons-vue';
 import type { FormInstance, FormRules, UploadFile, UploadInstance } from 'element-plus';
 import { useAppStore } from '@/stores/app';
-import { cloneVoice, listVoices, deleteVoice as deleteVoiceAPI, quickTTS } from '@/services/api';
+import { cloneVoice, listVoices, deleteVoice as deleteVoiceAPI, quickTTS, saveVoiceToBlockchain } from '@/services/api';
 import type { VoiceCloneRequest, VoiceCloneResponse, Voice } from '@/types/api';
 import { getRelationshipLabel } from '@/utils/format';
 import { validateAudioFile } from '@/utils/audio';
+import { shortenIPFSHash as shortenHash, copyIPFSHash as copyHash, getIPFSExplorerUrl } from '@/utils/ipfs';
 
 const emit = defineEmits<{
   'clone-success': [voiceId: string, voiceName: string],
@@ -285,9 +340,9 @@ const cloneForm = reactive<Omit<VoiceCloneRequest, 'audio_file' | 'user_id'> & {
 });
 
 const cloneRules = reactive<FormRules>({
-  relationship_id: [{ required: true, message: '请选择一个已验证的关系', trigger: 'change' }],
-  voice_name: [{ required: true, message: '请输入声音名称', trigger: 'blur' }],
-  audio_file: [{ required: true, message: '请上传音频文件' }],
+  relationship_id: [{ required: true, message: 'Please select a verified relationship', trigger: 'change' }],
+  voice_name: [{ required: true, message: 'Please enter a voice name', trigger: 'blur' }],
+  audio_file: [{ required: true, message: 'Please upload an audio file' }],
 });
 
 const cloning = ref(false);
@@ -301,6 +356,7 @@ const loadingVoices = ref(false);
 const deletingVoice = ref<string | null>(null);
 const testingVoice = ref<string | null>(null);
 const testAudioUrl = ref<string | null>(null);
+const savingToBlockchain = ref(false);
 
 onMounted(async () => {
   await loadVoices();
@@ -309,7 +365,7 @@ onMounted(async () => {
 function handleRelationshipChange(id: number) {
   const rel = appStore.approvedRelationships.find(r => r.id === id);
   if (rel) {
-    cloneForm.voice_name = `${rel.relative_name}的声音`;
+    cloneForm.voice_name = `${rel.relative_name}'s Voice`;
   }
 }
 
@@ -352,19 +408,19 @@ async function submitClone() {
     try {
       // Simulate progress
       cloneStep.value = 1;
-      cloneProgress.value = '正在上传音频文件...';
+      cloneProgress.value = 'Uploading audio file...';
       await new Promise(res => setTimeout(res, 1000));
 
       cloneStep.value = 2;
-      cloneProgress.value = '服务器正在分析音频特征... (这可能需要几分钟)';
+      cloneProgress.value = 'Analyzing audio features... (This may take a few minutes)';
       
       const result = await cloneVoice(request);
       cloneResult.value = result;
 
       if (result.success) {
         cloneStep.value = 4;
-        cloneProgress.value = '克隆成功！';
-        ElMessage.success('声音克隆成功！');
+        cloneProgress.value = 'Voice Cloned Successfully!';
+        ElMessage.success('Voice Cloned Successfully!');
         appStore.setVoiceCloned(result.voice_id, result.voice_name);
         emit('clone-success', result.voice_id, result.voice_name);
         await loadVoices();
@@ -373,7 +429,7 @@ async function submitClone() {
       }
     } catch (error: any) {
       cloneStep.value = 0;
-      ElMessage.error(`克隆失败: ${error.response?.data?.detail || error.message}`);
+      ElMessage.error(`Cloning Failed: ${error.response?.data?.detail || error.message}`);
       cloneResult.value = { success: false, message: error.message } as any;
     } finally {
       cloning.value = false;
@@ -396,7 +452,7 @@ async function loadVoices() {
       voices.value = data.voices;
     }
   } catch (error: any) {
-    ElMessage.error(`加载声音列表失败: ${error.message}`);
+    ElMessage.error(`Failed to load voices: ${error.message}`);
   } finally {
     loadingVoices.value = false;
   }
@@ -406,13 +462,13 @@ async function handleDeleteVoice(voiceId: string) {
   try {
     deletingVoice.value = voiceId;
     await deleteVoiceAPI(voiceId);
-    ElMessage.success('声音已删除');
+    ElMessage.success('Voice deleted');
     await loadVoices();
     if (appStore.voiceId === voiceId) {
       appStore.reset(); // Or just reset voice part
     }
   } catch (error: any) {
-    ElMessage.error(`删除失败: ${error.message}`);
+    ElMessage.error(`Delete failed: ${error.message}`);
   } finally {
     deletingVoice.value = null;
   }
@@ -422,14 +478,64 @@ async function testVoice(voiceId: string) {
   try {
     testingVoice.value = voiceId;
     testAudioUrl.value = null;
-    const text = '你好，这是一个声音测试。';
+    const text = 'Hello, this is a voice test.';
     const audioBlob = await quickTTS(text, voiceId);
     testAudioUrl.value = URL.createObjectURL(audioBlob);
   } catch (error: any) {
-    ElMessage.error(`测试失败: ${error.message}`);
+    ElMessage.error(`Test failed: ${error.message}`);
   } finally {
     testingVoice.value = null;
   }
+}
+
+async function saveToBlockchain() {
+  if (!cloneResult.value || !cloneResult.value.voice_id || !appStore.walletAddress) {
+    ElMessage.error('Missing voice ID or wallet address');
+    return;
+  }
+  
+  savingToBlockchain.value = true;
+  try {
+    // Mock IPFS hash for demo
+    const ipfsHash = `QmVxPwNP` + cloneResult.value.voice_id.slice(0, 24);
+    
+    const result = await saveVoiceToBlockchain(
+      cloneResult.value.voice_id,
+      cloneResult.value.voice_name,
+      ipfsHash,
+      appStore.walletAddress
+    );
+    
+    if (result.success) {
+      cloneResult.value.blockchain_saved = true;
+      ElMessage.success(`✅ Voice saved to blockchain! Tx: ${result.tx_hash?.slice(0, 10)}...`);
+    } else {
+      ElMessage.error(`❌ Failed to save: ${result.error}`);
+    }
+  } catch (error: any) {
+    ElMessage.error(`Blockchain save failed: ${error.message}`);
+  } finally {
+    savingToBlockchain.value = false;
+  }
+}
+
+// IPFS 工具函数
+function shortenIPFSHash(hash: string): string {
+  return shortenHash(hash, 8, 6);
+}
+
+async function copyIPFSHash(hash: string) {
+  const success = await copyHash(hash);
+  if (success) {
+    ElMessage.success('IPFS hash copied to clipboard!');
+  } else {
+    ElMessage.error('Failed to copy IPFS hash');
+  }
+}
+
+function openIPFSGateway(hash: string) {
+  const url = getIPFSExplorerUrl(hash);
+  window.open(url, '_blank');
 }
 
 function proceedToNextStep() {

@@ -2,14 +2,14 @@
   <div class="agent-creation">
     <div class="header">
       <h2>🧠 Step 2: Create Digital Agent</h2>
-      <p class="subtitle">根据您所爱之人的信息，创建一个数字代理</p>
+      <p class="subtitle">Create a digital agent based on your loved one's information.</p>
     </div>
 
     <el-alert
       v-if="!appStore.voiceCloned"
       type="warning"
-      title="⚠️ 需要先完成声音克隆"
-      description="请先在 Step 1 完成声音克隆"
+      title="⚠️ Voice Cloning Required"
+      description="Please complete Voice Cloning in Step 1 first."
       :closable="false"
       show-icon
       style="margin-bottom: 20px;"
@@ -21,7 +21,7 @@
         <el-card shadow="hover">
           <template #header>
             <div class="card-header">
-              <span>🤖 创建新的代理</span>
+              <span>🤖 Create New Agent</span>
             </div>
           </template>
 
@@ -33,60 +33,60 @@
             :disabled="!appStore.voiceCloned"
             @submit.prevent="submitAgent"
           >
-            <el-form-item label="代理名称" prop="name">
+            <el-form-item label="Agent Name" prop="name">
               <el-input 
                 v-model="agentForm.name" 
-                placeholder="例如：慈祥的父亲"
+                placeholder="e.g. Kind Father"
               />
             </el-form-item>
 
-            <el-form-item label="与您的关系" prop="relationship">
+            <el-form-item label="Relationship" prop="relationship">
               <el-input 
                 v-model="agentForm.relationship" 
-                placeholder="例如：父亲"
+                placeholder="e.g. Father"
               />
             </el-form-item>
 
-            <el-form-item label="性格特点" prop="personality_traits">
+            <el-form-item label="Personality Traits" prop="personality_traits">
               <el-input
                 v-model="agentForm.personality_traits"
                 type="textarea"
                 :rows="3"
-                placeholder="描述性格，例如：善良、有耐心、幽默、喜欢讲道理"
+                placeholder="Describe traits, e.g. kind, patient, humorous, wise"
               />
             </el-form-item>
 
-            <el-form-item label="说话习惯" prop="speech_patterns">
+            <el-form-item label="Speech Patterns" prop="speech_patterns">
               <el-select
                 v-model="agentForm.speech_patterns"
                 multiple
                 filterable
                 allow-create
                 default-first-option
-                placeholder="输入口头禅或常用语，按回车确认"
+                placeholder="Enter catchphrases or common sayings, press Enter"
                 style="width: 100%;"
               >
               </el-select>
               <el-text size="small" type="info" style="margin-top: 5px; display: block;">
-                例如：“你这个小家伙”、“要注意身体啊”
+                e.g., 'You little rascal', 'Take care of yourself'
               </el-text>
             </el-form-item>
 
-            <el-form-item label="背景故事" prop="background_story">
+            <el-form-item label="Background Story" prop="background_story">
               <el-input
                 v-model="agentForm.background_story"
                 type="textarea"
                 :rows="5"
-                placeholder="描述其生平、重要经历、职业等"
+                placeholder="Describe life events, important experiences, career, etc."
               />
             </el-form-item>
             
-            <el-form-item label="共同回忆" prop="memories">
+            <el-form-item label="Shared Memories" prop="memories">
               <el-input
                 v-model="memoriesInput"
                 type="textarea"
                 :rows="4"
-                placeholder="输入你们之间的共同回忆，每条回忆占一行"
+                placeholder="Enter shared memories, one per line"
                 @change="updateMemories"
               />
             </el-form-item>
@@ -100,10 +100,10 @@
                 :disabled="!appStore.voiceCloned"
                 :icon="Cpu"
               >
-                创建代理
+                Create Agent
               </el-button>
               <el-button @click="resetForm" :disabled="creating">
-                重置
+                Reset
               </el-button>
             </el-form-item>
           </el-form>
@@ -115,14 +115,14 @@
         <el-card shadow="hover">
           <template #header>
             <div class="card-header">
-              <span>ℹ️ 代理信息</span>
+              <span>ℹ️ Agent Info</span>
             </div>
           </template>
           <div v-if="appStore.agentCreated">
             <el-descriptions :column="1" border>
-              <el-descriptions-item label="代理名称">{{ appStore.agentName }}</el-descriptions-item>
-              <el-descriptions-item label="状态">
-                <el-tag type="success">已创建</el-tag>
+              <el-descriptions-item label="Agent Name">{{ appStore.agentName }}</el-descriptions-item>
+              <el-descriptions-item label="Status">
+                <el-tag type="success">Created</el-tag>
               </el-descriptions-item>
             </el-descriptions>
             <el-button
@@ -131,8 +131,23 @@
               @click="proceedToNextStep"
               :icon="ChatDotRound"
             >
-              开始对话 →
+              Start Chat →
             </el-button>
+            <el-button
+              v-if="enableAgentChainProof && appStore.walletAddress && !agentBlockchainSaved"
+              type="warning"
+              style="margin-top: 10px; width: 100%;"
+              @click="saveAgentBlockchain"
+              :loading="savingBlockchain"
+            >
+              🔗 Save Hash Proof On-chain
+            </el-button>
+            <div v-if="agentBlockchainSaved" style="margin-top: 15px; padding: 15px; background: #f0f9ff; border-radius: 4px; border-left: 4px solid #67c23a;">
+              <p style="margin: 0 0 8px 0; font-size: 14px; color: #67c23a; font-weight: 600;">✅ Saved to Blockchain</p>
+              <p style="margin: 0; font-size: 12px; color: #606266; word-break: break-all;">
+                TX: <span style="font-family: monospace;">{{ agentTxHash.substring(0, 10) }}...{{ agentTxHash.substring(agentTxHash.length - 8) }}</span>
+              </p>
+            </div>
             <el-button
               type="danger"
               style="margin-top: 10px; width: 100%;"
@@ -140,23 +155,23 @@
               :loading="reseting"
               :icon="RefreshLeft"
             >
-              重置代理
+              Reset Agent
             </el-button>
           </div>
-          <el-empty v-else description="尚未创建代理" />
+          <el-empty v-else description="No agent created yet" />
         </el-card>
 
         <el-card shadow="hover" style="margin-top: 20px;">
           <template #header>
-            <span>💡 提示</span>
+            <span>💡 Tips</span>
           </template>
           <div class="tips-content">
-            <h4>如何创建更真实的代理？</h4>
+            <h4>How to create a more realistic agent?</h4>
             <ul>
-              <li><strong>细节是关键</strong>: 提供越详细、越具体的信息，代理的行为就越真实。</li>
-              <li><strong>多样的口头禅</strong>: 添加多个说话习惯，能让对话更自然。</li>
-              <li><strong>丰富的故事</strong>: 背景故事和共同回忆是塑造代理长期记忆和个性的核心。</li>
-              <li><strong>持续迭代</strong>: 您可以随时重置并使用更新的信息重新创建代理。</li>
+              <li><strong>Detail is key</strong>: The more specific information you provide, the more realistic the agent will behave.</li>
+              <li><strong>Diverse catchphrases</strong>: Adding multiple speech habits makes conversations more natural.</li>
+              <li><strong>Rich stories</strong>: Background stories and shared memories are core to shaping the agent's long-term memory and personality.</li>
+              <li><strong>Iterate</strong>: You can reset and recreate the agent with updated information at any time.</li>
             </ul>
           </div>
         </el-card>
@@ -171,7 +186,7 @@ import { ElMessage } from 'element-plus';
 import { Cpu, ChatDotRound, RefreshLeft } from '@element-plus/icons-vue';
 import type { FormInstance, FormRules } from 'element-plus';
 import { useAppStore } from '@/stores/app';
-import { createAgent, resetAgent } from '@/services/api';
+import { createAgent, resetAgent, saveAgentToBlockchain } from '@/services/api';
 import type { AgentProfile } from '@/types/api';
 
 const emit = defineEmits<{
@@ -194,19 +209,23 @@ const agentForm = reactive<AgentProfile>({
 const memoriesInput = ref('');
 
 const agentRules = reactive<FormRules>({
-  name: [{ required: true, message: '请输入代理名称', trigger: 'blur' }],
-  relationship: [{ required: true, message: '请输入与您的关系', trigger: 'blur' }],
-  personality_traits: [{ required: true, message: '请描述性格特点', trigger: 'blur' }],
+  name: [{ required: true, message: 'Please enter agent name', trigger: 'blur' }],
+  relationship: [{ required: true, message: 'Please enter relationship', trigger: 'blur' }],
+  personality_traits: [{ required: true, message: 'Please describe personality traits', trigger: 'blur' }],
 });
 
 const creating = ref(false);
 const reseting = ref(false);
+const savingBlockchain = ref(false);
+const agentBlockchainSaved = ref(false);
+const agentTxHash = ref('');
+const enableAgentChainProof = false;
 
 onMounted(() => {
   // Pre-fill from relationship if possible
   if (appStore.approvedRelationships.length > 0) {
     const rel = appStore.approvedRelationships[0];
-    agentForm.name = `数字化的${rel.relative_name}`;
+    agentForm.name = `Digital ${rel.relative_name}`;
     agentForm.relationship = rel.relative_name;
   }
 });
@@ -224,14 +243,14 @@ async function submitAgent() {
     try {
       const result = await createAgent(agentForm);
       if (result.success) {
-        ElMessage.success('代理创建成功！');
+        ElMessage.success('Agent Created Successfully!');
         appStore.setAgentCreated(result.agent_name);
         emit('creation-success', result.agent_name);
       } else {
         throw new Error(result.message);
       }
     } catch (error: any) {
-      ElMessage.error(`创建失败: ${error.response?.data?.detail || error.message}`);
+      ElMessage.error(`Creation Failed: ${error.response?.data?.detail || error.message}`);
     } finally {
       creating.value = false;
     }
@@ -248,10 +267,10 @@ async function handleResetAgent() {
   reseting.value = true;
   try {
     await resetAgent();
-    ElMessage.success('代理已重置');
+    ElMessage.success('Agent Reset');
     appStore.reset(); // Full reset
   } catch (error: any) {
-    ElMessage.error(`重置失败: ${error.message}`);
+    ElMessage.error(`Reset Failed: ${error.message}`);
   } finally {
     reseting.value = false;
   }
@@ -259,6 +278,52 @@ async function handleResetAgent() {
 
 function proceedToNextStep() {
   emit('next-step');
+}
+
+async function saveAgentBlockchain() {
+  if (!appStore.walletAddress) {
+    ElMessage.error('Please connect wallet first');
+    return;
+  }
+  
+  savingBlockchain.value = true;
+  try {
+    const proofInput = JSON.stringify({
+      agent_name: agentForm.name,
+      relationship: agentForm.relationship,
+      personality_traits: agentForm.personality_traits,
+      speech_patterns: agentForm.speech_patterns,
+    });
+
+    let ipfsHash = `sha256:${Date.now()}`;
+    if (window?.crypto?.subtle) {
+      const encoder = new TextEncoder();
+      const digest = await crypto.subtle.digest('SHA-256', encoder.encode(proofInput));
+      const hex = Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('');
+      ipfsHash = `sha256:${hex}`;
+    }
+    
+    const response = await saveAgentToBlockchain({
+      agent_name: agentForm.name,
+      ipfs_hash: ipfsHash,
+      wallet_address: appStore.walletAddress,
+      agent_data: {
+        proof_type: 'hash_only',
+      }
+    });
+    
+    if (response.success && response.tx_hash) {
+      agentTxHash.value = response.tx_hash;
+      agentBlockchainSaved.value = true;
+      ElMessage.success(`Agent hash proof saved on-chain! Tx: ${response.tx_hash}`);
+    } else {
+      throw new Error('Failed to save agent proof');
+    }
+  } catch (error: any) {
+    ElMessage.error(`Blockchain save failed: ${error.response?.data?.detail || error.message}`);
+  } finally {
+    savingBlockchain.value = false;
+  }
 }
 </script>
 

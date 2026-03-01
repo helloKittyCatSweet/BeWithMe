@@ -33,6 +33,9 @@ export interface VoiceCloneResponse {
     quality_score?: number;
     audio_format?: string;
   };
+  ipfs_hash?: string;
+  ipfs_gateway_url?: string;
+  blockchain_saved?: boolean;
 }
 
 export interface Voice {
@@ -58,6 +61,10 @@ export interface ChatMessage {
   user: string;
   agent: string;
   timestamp?: string;
+  blockchain_tx_hash?: string;  // 区块链交易哈希
+  ipfs_hash?: string;  // IPFS 内容哈希
+  on_chain_timestamp?: string;  // 上链时间戳
+  role?: string;  // For PhoneCall mapping
 }
 
 export interface SystemStatus {

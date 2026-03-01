@@ -104,13 +104,53 @@ class KinModel(weave.Model):
 
     @weave.op()
     async def predict(self, messages: list) -> str:
-        """统一预测接口"""
+        """
+        核心修复：针对 train/val 数据格式进行截断
+        """
+        # 1. 深度拷贝一份消息，防止修改原始数据
+        import copy
+        inference_messages = copy.deepcopy(messages)
+
+        # 2. 截断逻辑：如果最后一条是 assistant 的回复（即答案），将其移除
+        # 这样模型才能接收到以 User 结尾的 Prompt
+        while inference_messages and inference_messages[-1]["role"].lower() == "assistant":
+            inference_messages.pop()
+
+        # 3. 健壮性检查：如果没有消息了或者最后一条不是 user，手动提取
+        if not inference_messages or inference_messages[-1]["role"].lower() != "user":
+            # 尝试从原始列表中找最后一条 user 消息
+            last_user = next((m for m in reversed(messages) if m["role"] == "user"), None)
+            if last_user:
+                # 重新构造：System + 最后一条 User
+                inference_messages = [
+                    {"role": "system", "content": self.system_prompt},
+                    last_user
+                ]
+            else:
+                return "Error: No user message found in conversation."
+
+        # 4. 执行推理
         if self.model_type == 'api':
-            # 适配 API 调用
-            return await self._predict_api(messages)
+            return await self._predict_api(inference_messages)
         else:
-            # 适配本地 Transformers 调用
-            return self._predict_local(messages)
+            return self._predict_local(inference_messages)
+
+    async def _predict_api(self, messages: list) -> str:
+        """API 调用现在接收到的已经是截断好的 messages 了"""
+        try:
+            # 适配 Ministral 在 API 端的命名习惯
+            api_model = "ministral-3b-latest" if "ministral" in self.model_id.lower() else self.model_id
+            
+            response = await client.chat.complete_async(
+                model=api_model,
+                messages=messages,
+                temperature=self.temperature
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            # 如果报 400 错误，打印出消息结构方便调试
+            print(f"DEBUG: Error messages structure: {messages}")
+            return f"API Error: {e}"
 
     def _predict_local(self, messages: list) -> str:
         """按照 Transformers 官方文档重写的推理逻辑"""
@@ -145,20 +185,6 @@ class KinModel(weave.Model):
         except Exception as e:
             print(f"本地推理出错: {e}")
             return f"Local Error: {e}"
-
-    async def _predict_api(self, messages: list) -> str:
-        """API 推理逻辑保持不变"""
-        # 注意：Ministral 在 API 端的 ID 可能不同，通常为 'ministral-3b-latest'
-        api_model = "ministral-3b-latest" if "ministral" in self.model_id.lower() else self.model_id
-        try:
-            response = await client.chat.complete_async(
-                model=api_model,
-                messages=messages,
-                temperature=self.temperature
-            )
-            return response.choices[0].message.content
-        except Exception as e:
-            return f"API Error: {e}"
 
 # --- 4. 评分裁判定义 ---
 # 关键：暂时不继承 weave.Scorer，直接使用普通类

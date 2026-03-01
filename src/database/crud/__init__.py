@@ -36,6 +36,17 @@ from .voice_profile import (
     delete_voice_profile,
 )
 
+# 代理档案管理
+from .agent_profile import (
+    create_agent_profile,
+    get_agent_profile_by_id,
+    get_agent_profile,
+    get_user_agent_profiles,
+    update_agent_profile,
+    deactivate_agent_profile,
+    delete_agent_profile,
+)
+
 # 对话记录管理
 from .conversation import (
     create_conversation,
@@ -57,6 +68,16 @@ from .audit import (
 from .stats import (
     get_system_stats,
     get_user_summary,
+)
+
+# 验证文档管理
+from .verification_document import (
+    create_verification_document,
+    get_document_by_id,
+    get_documents_by_relationship,
+    get_documents_by_user,
+    delete_document,
+    get_document_stats,
 )
 
 __all__ = [
@@ -88,6 +109,15 @@ __all__ = [
     "deactivate_voice_profile",
     "delete_voice_profile",
     
+    # Agent Profile
+    "create_agent_profile",
+    "get_agent_profile_by_id",
+    "get_agent_profile",
+    "get_user_agent_profiles",
+    "update_agent_profile",
+    "deactivate_agent_profile",
+    "delete_agent_profile",
+    
     # Conversation
     "create_conversation",
     "get_conversation_by_id",
@@ -104,4 +134,12 @@ __all__ = [
     # Stats
     "get_system_stats",
     "get_user_summary",
+    
+    # Verification Document
+    "create_verification_document",
+    "get_document_by_id",
+    "get_documents_by_relationship",
+    "get_documents_by_user",
+    "delete_document",
+    "get_document_stats",
 ]

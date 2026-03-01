@@ -19,7 +19,10 @@ def create_voice_profile(
     voice_name: str,
     description: Optional[str] = None,
     source_audio_path: Optional[str] = None,
-    audio_duration: Optional[int] = None
+    audio_duration: Optional[int] = None,
+    ipfs_hash: Optional[str] = None,
+    ipfs_gateway_url: Optional[str] = None,
+    ipfs_uploaded_at: Optional[datetime] = None
 ) -> VoiceProfile:
     """创建音色档案（需要验证关系）"""
     # 验证关系有效性
@@ -33,7 +36,10 @@ def create_voice_profile(
         voice_name=voice_name,
         description=description,
         source_audio_path=source_audio_path,
-        audio_duration=audio_duration
+        audio_duration=audio_duration,
+        ipfs_hash=ipfs_hash,
+        ipfs_gateway_url=ipfs_gateway_url,
+        ipfs_uploaded_at=ipfs_uploaded_at
     )
     
     db.add(voice_profile)
