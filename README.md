@@ -27,6 +27,10 @@
 
 ## 🏗️ 系统架构图
 
+![BeWithMe 架构图](docs/architecture.svg)
+
+*图 1: BeWithMe 系统技术架构。展示了从前端交互到后端 Mistral 引擎，再到 Google Colab 训练与区块链确权的全链路流程。*
+
 ```mermaid
 graph TD
     subgraph Frontend [用户前端 - Streamlit]

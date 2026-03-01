@@ -19,7 +19,7 @@ XTTS_LANGUAGE = os.getenv("XTTS_LANGUAGE", "zh-cn")
 
 # Pinata IPFS Configuration
 PINATA_API_KEY = os.getenv("PINATA_API_KEY", "f287105113f97222914c")
-PINATA_SECRET_KEY = os.getenv("PINATA_SECRET_KEY", "b9c8d88f86539e515a4b87fc426b321adc81496294ec73d74bc6fe3d31e8b78d")
+PINATA_SECRET_API_KEY = os.getenv("PINATA_SECRET_KAPI_EY", "b9c8d88f86539e515a4b87fc426b321adc81496294ec73d74bc6fe3d31e8b78d")
 IPFS_ENABLED = os.getenv("IPFS_ENABLED", "true").lower() == "true"
 
 # W&B Configuration

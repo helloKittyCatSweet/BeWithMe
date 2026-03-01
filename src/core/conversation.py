@@ -51,24 +51,24 @@ class PersonalityProfile:
         self.custom_prompt = custom_prompt
     
     def generate_system_prompt(self) -> str:
-        """生成系统提示词"""
-        patterns_str = "、".join(self.speech_patterns) if self.speech_patterns else "温暖亲切"
+        """生成系统提示词 (English focused for international presentation)"""
+        patterns_str = ", ".join(self.speech_patterns) if self.speech_patterns else "warm and kind"
         
-        prompt = f"""你现在是{self.name}，是用户的{self.relationship}。
+        prompt = f"""You are now playing the role of {self.name}, who is the user's {self.relationship}.
 
-你的性格特征：{self.personality_traits}
+Personality Traits: {self.personality_traits}
+Speech Style/Patterns: {patterns_str}
 
-你的说话风格特点：{patterns_str}
-
-重要规则：
-1. 保持回复简短，不超过30字，像真正的电话通话一样自然
-2. 用口语化的表达，不要书面语
-3. 体现长辈的关怀和温暖
-4. 可以适当重复一些口头禅
+CRITICAL RULES:
+1. RESPONSE LANGUAGE: You MUST respond in ENGLISH. Even if the user speaks to you in another language, you must reply in English for this international presentation.
+2. BREVITY: Keep your responses very short (under 30 words), natural, and concise, just like a real phone conversation.
+3. TONE: Use a colloquial, spoken style. Avoid formal or written language.
+4. EMOTION: Show the warmth, care, and love of a family member.
+5. HABITS: You may occasionally use characteristic catchphrases or repetitive patterns consistent with your role.
 
 {self.custom_prompt}
 
-请根据用户的输入进行回复，让对方感受到真实的亲情温暖。"""
+Please respond to the user's input now, ensuring they feel the genuine warmth of family connection in English."""
         
         return prompt
 
@@ -102,14 +102,6 @@ class ConversationAgent:
         self.client = Mistral(api_key=self.api_key)
         self.conversation_history: List[Dict] = []
         self.voice_id: Optional[str] = None  # Optional voice ID for TTS
-        
-        # 初始化 W&B Weave（可选）
-        if enable_weave and WEAVE_AVAILABLE:
-            try:
-                weave.init(WANDB_PROJECT)
-                logger.info("✅ W&B Weave 追踪已启用")
-            except Exception as e:
-                logger.warning(f"⚠️  W&B Weave 初始化失败: {str(e)}")
     
     def generate_response(
         self, 
@@ -144,26 +136,9 @@ class ConversationAgent:
             
             # 调用 Mistral API
             if stream:
-                response_text = ""
-                for chunk in self.client.chat_stream(
-                    model=MISTRAL_MODEL,
-                    messages=messages,
-                    temperature=TEMPERATURE,
-                    max_tokens=MAX_TOKENS
-                ):
-                    if hasattr(chunk, 'choices') and chunk.choices and len(chunk.choices) > 0:
-                        if hasattr(chunk.choices[0], 'delta') and chunk.choices[0].delta:
-                            if hasattr(chunk.choices[0].delta, 'content') and chunk.choices[0].delta.content:
-                                content = chunk.choices[0].delta.content
-                                response_text += content
-                                yield content
-                
-                # 保存对话历史
-                self.conversation_history.append({"role": "user", "content": user_input})
-                self.conversation_history.append({"role": "assistant", "content": response_text})
-                
+                return self._generate_stream(messages, user_input)
             else:
-                response = self.client.chat(
+                response = self.client.chat.complete(
                     model=MISTRAL_MODEL,
                     messages=messages,
                     temperature=TEMPERATURE,
@@ -178,15 +153,32 @@ class ConversationAgent:
                 
                 return response_text
                 
-                # 保存对话历史
-                self.conversation_history.append({"role": "user", "content": user_input})
-                self.conversation_history.append({"role": "assistant", "content": response_text})
-                
-                return response_text
-                
         except Exception as e:
             logger.error(f"❌ 生成回复时出错: {str(e)}")
             return "抱歉，我现在说不出话来了..."
+
+    def _generate_stream(self, messages, user_input):
+        try:
+            response_text = ""
+            for chunk in self.client.chat_stream(
+                model=MISTRAL_MODEL,
+                messages=messages,
+                temperature=TEMPERATURE,
+                max_tokens=MAX_TOKENS
+            ):
+                if hasattr(chunk, 'choices') and chunk.choices and len(chunk.choices) > 0:
+                    if hasattr(chunk.choices[0], 'delta') and chunk.choices[0].delta:
+                        if hasattr(chunk.choices[0].delta, 'content') and chunk.choices[0].delta.content:
+                            content = chunk.choices[0].delta.content
+                            response_text += content
+                            yield content
+            
+            # 保存对话历史
+            self.conversation_history.append({"role": "user", "content": user_input})
+            self.conversation_history.append({"role": "assistant", "content": response_text})
+        except Exception as e:
+            logger.error(f"❌ 流式生成回复时出错: {str(e)}")
+            yield "抱歉，我现在说不出话来了..."
     
     def check_safety(self, text: str) -> tuple[bool, str]:
         """

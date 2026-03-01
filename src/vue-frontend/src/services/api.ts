@@ -96,11 +96,11 @@ export const registerRelationship = async (
 export const listRelationships = async (
   userId: number,
   status?: string
-): Promise<RelationshipData[]> => {
+): Promise<any[]> => {
   const { data } = await apiClient.get('/relationships/list', {
     params: { user_id: userId, status }
   });
-  return data;
+  return Array.isArray(data) ? data : [];
 };
 
 export const uploadVerificationDocument = async (
@@ -252,8 +252,16 @@ export const cloneVoice = async (
 };
 
 export const listVoices = async (): Promise<{ success: boolean; voices: Voice[] }> => {
-  const { data } = await apiClient.get('/voice/list');
-  return data;
+  try {
+    const { data } = await apiClient.get('/voice/list', {
+      params: { user_id: 1 }
+    });
+    // Backend returns { success, count, voices } format
+    return data;
+  } catch (error) {
+    console.error('Failed to load voices:', error);
+    return { success: false, voices: [] };
+  }
 };
 
 export const deleteVoice = async (voiceId: string): Promise<{ success: boolean; message: string }> => {
@@ -312,13 +320,29 @@ export const resetAgent = async (): Promise<{ success: boolean; message: string 
 export const listVoiceProfiles = async (
   userId: number
 ): Promise<any[]> => {
-  const { data } = await apiClient.get('/voice/list', {
+  const { data } = await apiClient.get('/voice/profiles', {
     params: { user_id: userId }
   });
-  return data;
+  return Array.isArray(data) ? data : [];
 };
 
 // ============ Agent APIs ============
+
+export const listAgents = async (
+  userId: number
+): Promise<any[]> => {
+  const { data } = await apiClient.get('/agent/list', {
+    params: { user_id: userId }
+  });
+  return Array.isArray(data) ? data : [];
+};
+
+export const selectAgent = async (
+  profileId: number
+): Promise<{ success: boolean; message: string; name: string }> => {
+  const { data } = await apiClient.post(`/agent/select/${profileId}`);
+  return data;
+};
 
 export const sendTextMessage = async (
   message: string,

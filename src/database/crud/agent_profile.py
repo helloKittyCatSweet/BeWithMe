@@ -23,10 +23,10 @@ def create_agent_profile(
     agent_profile = AgentProfile(
         user_id=user_id,
         name=name,
-        relationship=relationship,
-        personality_traits=personality_traits,
+        relationship_type=relationship,  # 映射到 relationship_type
+        personality=personality_traits,   # 映射到 personality
         speech_patterns=speech_patterns or [],
-        background_story=background_story,
+        background=background_story,      # 映射到 background
         memories=memories or []
     )
     
@@ -52,16 +52,10 @@ def get_agent_profile(
 
 def get_user_agent_profiles(
     db: Session, 
-    user_id: int,
-    active_only: bool = True
+    user_id: int
 ) -> List[AgentProfile]:
     """获取用户的所有代理档案"""
-    query = db.query(AgentProfile).filter(AgentProfile.user_id == user_id)
-    
-    if active_only:
-        query = query.filter(AgentProfile.is_active == True)
-    
-    return query.all()
+    return db.query(AgentProfile).filter(AgentProfile.user_id == user_id).order_by(AgentProfile.created_at.desc()).all()
 
 
 def update_agent_profile(
@@ -87,13 +81,16 @@ def update_agent_profile(
 
 
 def deactivate_agent_profile(db: Session, profile_id: int) -> bool:
-    """停用代理档案"""
+    """停用代理档案（通过删除实现，因为模型中没有 is_active 字段）"""
+    # 注意：AgentProfile 模型中没有 is_active 字段
+    # 如果需要软删除功能，请在模型中添加 is_active 字段
     agent = get_agent_profile_by_id(db, profile_id)
     
     if not agent:
         return False
     
-    agent.is_active = False
+    # 暂时使用删除来代替停用
+    db.delete(agent)
     db.commit()
     
     return True

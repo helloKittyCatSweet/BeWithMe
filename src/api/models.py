@@ -31,10 +31,27 @@ class ChatResponse(BaseModel):
 
 
 class VoiceInfo(BaseModel):
-    """音色信息"""
+    """音色信息（系统声音列表）"""
+    model_config = {"from_attributes": True}
+    
     voice_id: str
     name: str
     description: Optional[str] = None
+
+
+class VoiceProfileResponse(BaseModel):
+    """音色档案响应（数据库中的 voice profiles）"""
+    model_config = {"from_attributes": True, "populate_by_name": True}
+    
+    id: int
+    voice_id: str
+    voice_name: str = Field(..., serialization_alias="name")  # 序列化时使用 name
+    description: Optional[str] = None
+    user_id: int
+    relationship_id: int
+    blockchain_minted: bool = False
+    blockchain_tx_hash: Optional[str] = None
+    ipfs_hash: Optional[str] = None
 
 
 class SystemStatus(BaseModel):

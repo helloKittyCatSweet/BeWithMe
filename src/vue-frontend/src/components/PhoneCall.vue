@@ -1,162 +1,255 @@
 <template>
   <div class="phone-call-container">
-    <!-- Call History Section -->
-    <div class="call-history-section">
-      <div class="history-header">
-        <h3>Call History</h3>
-        <el-button text link @click="fetchHistory">Refresh</el-button>
-      </div>
-      <el-scrollbar height="600px">
-        <div v-if="history.length === 0" class="empty-history">
-          <el-empty description="No calls yet" :image-size="100" />
+    <!-- Agent Selection Overlay -->
+    <div v-if="!isAgentSelected" class="agent-selection-overlay">
+      <div class="selection-card">
+        <h2>Select an Agent to Call</h2>
+        <p>Choose which loved one you would like to talk to today.</p>
+        
+        <div v-if="loadingAgents" class="loading-state">
+          <el-skeleton :rows="3" animated />
         </div>
-        <div v-else class="history-list">
-          <div v-for="(call, index) in history" :key="index" class="history-item" :class="{ 'on-chain': call.blockchain_tx_hash }">
-            <div class="call-icon">
-              <el-icon :class="call.type === 'incoming' ? 'incoming' : 'outgoing'"><Phone /></el-icon>
+        
+        <div v-else-if="availableAgents.length === 0" class="empty-state">
+          <el-empty description="No agents created yet">
+            <el-button type="primary" @click="$router.push('/create-agent')">Create Your First Agent</el-button>
+          </el-empty>
+        </div>
+        
+        <div v-else class="agent-grid">
+          <div 
+            v-for="agent in availableAgents" 
+            :key="agent.id" 
+            class="agent-select-item"
+            @click="handleSelectAgent(agent)"
+          >
+            <div class="agent-avatar">{{ agent.name.charAt(0).toUpperCase() }}</div>
+            <div class="agent-info">
+              <span class="name">{{ agent.name }}</span>
+              <span class="relation">{{ agent.relationship }}</span>
             </div>
-            <div class="call-info">
-              <div class="caller-name">
-                {{ call.name || 'Unknown' }}
-                <el-tag v-if="call.blockchain_tx_hash" type="success" size="small" effect="plain" style="margin-left: 8px;">
-                  On-Chain
-                </el-tag>
-              </div>
-              <div class="call-time">{{ call.timestamp ? formatTime(call.timestamp) : 'Unknown time' }}</div>
-              <div v-if="call.blockchain_tx_hash" class="blockchain-proof">
-                <div class="proof-item">
-                  <span class="proof-label">TX:</span>
-                  <a :href="`https://sepolia.etherscan.io/tx/${call.blockchain_tx_hash}`" target="_blank" class="proof-link">
-                    {{ call.blockchain_tx_hash.substring(0, 10) }}...{{ call.blockchain_tx_hash.substring(call.blockchain_tx_hash.length - 8) }}
-                  </a>
-                </div>
-                <div v-if="call.ipfs_hash" class="proof-item">
-                  <span class="proof-label">IPFS:</span>
-                  <span class="proof-value">{{ call.ipfs_hash.substring(0, 10) }}...{{ call.ipfs_hash.substring(call.ipfs_hash.length - 8) }}</span>
-                </div>
-              </div>
-            </div>
+            <el-icon class="arrow-icon"><ArrowRight /></el-icon>
           </div>
         </div>
-      </el-scrollbar>
+      </div>
     </div>
 
-    <!-- Phone Simulator Section -->
-    <div class="phone-simulator">
-      <div class="phone-frame">
-        <div class="notch"></div>
-        <div class="screen" :class="callStatus">
-          
-          <!-- Idle / Contact Screen -->
-          <div v-if="callStatus === 'idle'" class="screen-content idle">
-            <div class="status-bar">
-              <span>9:41</span>
-              <div class="status-icons">
-                <el-icon><Connection /></el-icon>
-                <div class="battery-indicator">
-                  <el-progress :percentage="batteryPercentage" :color="batteryColor" :show-text="false" style="width: 50px; margin: 0 4px;"></el-progress>
-                </div>
+    <!-- Main Interface (Only shown if agent selected) -->
+    <template v-else>
+      <!-- Call History Section -->
+      <div class="call-history-section">
+        <div class="history-header">
+          <div class="header-title">
+            <h3>Call History</h3>
+            <el-tag size="small" type="info" class="agent-tag">{{ agentName }}</el-tag>
+          </div>
+          <div class="header-actions">
+            <el-button text link @click="isAgentSelected = false">Switch Agent</el-button>
+            <el-button text link @click="fetchHistory" :icon="Refresh">Refresh</el-button>
+          </div>
+        </div>
+        <el-scrollbar height="600px">
+          <div v-if="filteredHistory.length === 0" class="empty-history">
+            <el-empty description="No calls yet with this agent" :image-size="100" />
+          </div>
+          <div v-else class="history-list">
+            <div v-for="(call, index) in filteredHistory" :key="index" class="history-item" :class="{ 'on-chain': call.blockchain_tx_hash }">
+              <div class="call-icon">
+                <el-icon :class="call.type === 'incoming' ? 'incoming' : 'outgoing'"><Phone /></el-icon>
               </div>
-            </div>
-            <div class="contact-info">
-              <div class="avatar-placeholder">{{ agentInitial }}</div>
-              <h2>{{ agentName || 'Loved One' }}</h2>
-              <p>Mobile</p>
-            </div>
-            <div class="actions">
-              <div class="action-btn" @click="startSimulation">
-                <div class="btn-circle green">
-                  <el-icon><PhoneFilled /></el-icon>
+              <div class="call-info">
+                <div class="caller-name">
+                  {{ call.name || 'Unknown' }}
+                  <el-tag v-if="call.blockchain_tx_hash" type="success" size="small" effect="plain" style="margin-left: 8px;">
+                    On-Chain
+                  </el-tag>
                 </div>
-                <span>Call</span>
-              </div>
-              <div class="action-btn">
-                <div class="btn-circle grey">
-                  <el-icon><Message /></el-icon>
+                <div class="call-time">{{ call.timestamp ? formatTime(call.timestamp) : 'Unknown time' }}</div>
+                <div v-if="call.blockchain_tx_hash" class="blockchain-proof">
+                  <div class="proof-item">
+                    <span class="proof-label">TX:</span>
+                    <a :href="`https://sepolia.etherscan.io/tx/${call.blockchain_tx_hash}`" target="_blank" class="proof-link">
+                      {{ call.blockchain_tx_hash.substring(0, 10) }}...{{ call.blockchain_tx_hash.substring(call.blockchain_tx_hash.length - 8) }}
+                    </a>
+                  </div>
+                  <div v-if="call.ipfs_hash" class="proof-item">
+                    <span class="proof-label">IPFS:</span>
+                    <span class="proof-value">{{ call.ipfs_hash.substring(0, 10) }}...{{ call.ipfs_hash.substring(call.ipfs_hash.length - 8) }}</span>
+                  </div>
                 </div>
-                <span>Message</span>
               </div>
             </div>
           </div>
+        </el-scrollbar>
+      </div>
 
-          <!-- Incoming Call Screen -->
-          <div v-if="callStatus === 'incoming'" class="screen-content incoming">
-            <div class="caller-info">
-              <h2>{{ agentName || 'Loved One' }}</h2>
-              <p>Incoming Call...</p>
-            </div>
-            <div class="call-actions">
-              <div class="action-btn" @click="rejectCall">
-                <div class="btn-circle red big">
-                  <el-icon><PhoneFilled /></el-icon>
-                </div>
-                <span>Decline</span>
-              </div>
-              <div class="action-btn" @click="answerCall">
-                <div class="btn-circle green big">
-                  <el-icon><PhoneFilled /></el-icon>
-                </div>
-                <span>Accept</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- In Call Screen -->
-          <div v-if="callStatus === 'connected'" class="screen-content connected">
-            <div class="caller-info">
-              <h2>{{ agentName || 'Loved One' }}</h2>
-              <p>{{ callDurationFormatted }}</p>
+      <!-- Phone Simulator Section -->
+      <div class="phone-simulator">
+        <div class="phone-frame">
+          <div class="notch"></div>
+          <div class="screen" :class="callStatus">
+            <!-- Back Button for Call/Message -->
+            <div v-if="callStatus !== 'idle'" class="back-nav" @click="backToIdle">
+              <el-icon><ArrowLeft /></el-icon>
+              <span>Back</span>
             </div>
             
-            <div class="waveform-viz">
-              <div class="bar" v-for="i in 10" :key="i" :style="{ height: getBarHeight(i) + 'px' }"></div>
-            </div>
-
-            <div class="transcript-preview" v-if="lastMessage">
-               "{{ lastMessage }}"
-            </div>
-
-            <!-- Blockchain Verification Info -->
-            <div class="blockchain-verification" v-if="blockchainVerificationVisible">
-              <div class="verification-item" v-if="lastIPFSHash">
-                <span class="label">📦 IPFS:</span>
-                <span class="hash">{{ lastIPFSHash.substring(0, 16) }}...</span>
-              </div>
-              <div class="verification-item" v-if="lastBlockchainTxHash">
-                <span class="label">⛓️ Chain:</span>
-                <a :href="`https://sepolia.etherscan.io/tx/${lastBlockchainTxHash}`" target="_blank" class="chain-link">
-                  {{ lastBlockchainTxHash.substring(0, 10) }}...
-                </a>
-              </div>
-            </div>
-
-            <div class="call-controls">
-              <div class="control-row">
-                <div class="control-btn" title="静音"><el-icon><Mute /></el-icon></div>
-                <div class="btn-circle blue big" @click="manualSend" :disabled="!isRecording || isProcessing" title="说完了，点击发送">
-                  <el-icon><PhoneFilled /></el-icon>
+            <!-- Idle / Contact Screen -->
+            <div v-if="callStatus === 'idle'" class="screen-content idle">
+              <div class="status-bar">
+                <span>9:41</span>
+                <div class="status-icons">
+                  <el-icon><Connection /></el-icon>
+                  <div class="battery-indicator">
+                    <el-progress :percentage="batteryPercentage" :color="batteryColor" :show-text="false" style="width: 50px; margin: 0 4px;"></el-progress>
+                  </div>
                 </div>
-                <div class="control-btn" title="扬声器"><el-icon><VideoCamera /></el-icon></div>
               </div>
-              <div class="control-row end-call">
-                <div class="btn-circle red big" @click="endCall" title="挂断电话">
-                  <el-icon><PhoneFilled /></el-icon>
+              <div class="contact-info">
+                <div class="avatar-placeholder">{{ agentInitial }}</div>
+                <h2>{{ agentName }}</h2>
+                <p>Mobile</p>
+              </div>
+              <div class="actions">
+                <div class="action-btn" @click="startSimulation">
+                  <div class="btn-circle green">
+                    <el-icon><PhoneFilled /></el-icon>
+                  </div>
+                  <span>Call</span>
+                </div>
+                <div class="action-btn" @click="openMessaging">
+                  <div class="btn-circle grey">
+                    <el-icon><Message /></el-icon>
+                  </div>
+                  <span>Message</span>
                 </div>
               </div>
             </div>
+
+            <!-- Messaging Screen (WeChat Style) -->
+            <div v-if="callStatus === 'messaging'" class="screen-content messaging">
+              <div class="chat-header">
+                <div class="header-info">
+                  <div class="mini-avatar">{{ agentInitial }}</div>
+                  <span class="chat-name">{{ agentName }}</span>
+                </div>
+              </div>
+              
+              <div class="chat-messages" ref="chatScrollRef">
+                <div v-for="(msg, idx) in chatHistory" :key="idx" class="chat-bubble-wrapper" :class="msg.role">
+                  <div class="chat-bubble">
+                    {{ msg.content }}
+                  </div>
+                </div>
+                <div v-if="isProcessing" class="chat-bubble-wrapper agent">
+                  <div class="chat-bubble typing">
+                    <span class="dot">.</span><span class="dot">.</span><span class="dot">.</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="chat-input-wrapper">
+                <div class="voice-toggle">
+                  <el-tooltip :content="useVoiceInMessage ? 'Voice ON' : 'Voice OFF'">
+                    <el-icon :class="{ active: useVoiceInMessage }" @click="useVoiceInMessage = !useVoiceInMessage">
+                      <Microphone />
+                    </el-icon>
+                  </el-tooltip>
+                </div>
+                <input 
+                  v-model="textMessage" 
+                  placeholder="Type message..." 
+                  @keyup.enter="sendTextReply"
+                  :disabled="isProcessing"
+                />
+                <el-icon class="send-icon" @click="sendTextReply" :class="{ disabled: !textMessage.trim() || isProcessing }">
+                  <Promotion />
+                </el-icon>
+              </div>
+            </div>
+
+            <!-- Incoming Call Screen -->
+            <div v-if="callStatus === 'incoming'" class="screen-content incoming">
+              <div class="caller-info">
+                <h2>{{ agentName }}</h2>
+                <p>Incoming Call...</p>
+              </div>
+              <div class="call-actions">
+                <div class="action-btn" @click="rejectCall">
+                  <div class="btn-circle red big">
+                    <el-icon><PhoneFilled /></el-icon>
+                  </div>
+                  <span>Decline</span>
+                </div>
+                <div class="action-btn" @click="answerCall">
+                  <div class="btn-circle green big">
+                    <el-icon><PhoneFilled /></el-icon>
+                  </div>
+                  <span>Accept</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- In Call Screen -->
+            <div v-if="callStatus === 'connected'" class="screen-content connected">
+              <div class="caller-info">
+                <h2>{{ agentName }}</h2>
+                <p>{{ callDurationFormatted }}</p>
+              </div>
+              
+              <div class="waveform-viz">
+                <div class="bar" v-for="i in 10" :key="i" :style="{ height: getBarHeight(i) + 'px' }"></div>
+              </div>
+
+              <div class="transcript-preview" v-if="lastMessage">
+                 "{{ lastMessage }}"
+              </div>
+
+              <!-- Blockchain Verification Info -->
+              <div class="blockchain-verification" v-if="blockchainVerificationVisible">
+                <div class="verification-item" v-if="lastIPFSHash">
+                  <span class="label">IPFS:</span>
+                  <span class="hash">{{ lastIPFSHash.substring(0, 16) }}...</span>
+                </div>
+                <div class="verification-item" v-if="lastBlockchainTxHash">
+                  <span class="label">Chain:</span>
+                  <a :href="`https://sepolia.etherscan.io/tx/${lastBlockchainTxHash}`" target="_blank" class="chain-link">
+                    {{ lastBlockchainTxHash.substring(0, 10) }}...
+                  </a>
+                </div>
+              </div>
+
+              <div class="call-controls">
+                <div class="call-actions" style="justify-content: center; gap: 60px;">
+                  <div class="action-btn" @click="toggleRecording" :style="{ opacity: isProcessing ? 0.6 : 1, pointerEvents: isProcessing ? 'none' : 'auto' }">
+                    <div class="btn-circle big" :class="isRecording ? 'red recording-pulse' : 'blue'" :title="isRecording ? '点击停止并发送 (' + recordingDuration + ')' : '点击开始录音'">
+                      <el-icon><Microphone /></el-icon>
+                    </div>
+                    <span style="color: white; margin-top: 8px;">{{ isRecording ? '结束并发送 (' + recordingDuration + ')' : (isProcessing ? '处理中...' : '开始录音') }}</span>
+                  </div>
+
+                  <div class="action-btn" @click="endCall">
+                    <div class="btn-circle red big" title="挂断电话">
+                      <el-icon><PhoneFilled style="transform: rotate(135deg);" /></el-icon>
+                    </div>
+                    <span style="color: white; margin-top: 8px;">挂断电话</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
           </div>
-
         </div>
       </div>
-    </div>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import { useAppStore } from '@/stores/app';
-import { getChatHistory, sendVoiceMessage } from '@/services/api';
-import { Phone, PhoneFilled, Connection, Message, Microphone, VideoCamera, Mute } from '@element-plus/icons-vue';
+import { getChatHistory, sendVoiceMessage, listAgents, selectAgent, sendTextMessage } from '@/services/api';
+import { Phone, PhoneFilled, Connection, Message, Microphone, VideoCamera, Mute, ArrowRight, Refresh, ArrowLeft, Promotion } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
 
 interface CallHistoryItem {
@@ -171,7 +264,7 @@ interface CallHistoryItem {
 
 const appStore = useAppStore();
 const history = ref<CallHistoryItem[]>([]);
-const callStatus = ref<'idle' | 'incoming' | 'connected'>('idle');
+const callStatus = ref<'idle' | 'incoming' | 'connected' | 'messaging'>('idle');
 const callDuration = ref(0);
 const timer = ref<any>(null);
 const lastMessage = ref('');
@@ -182,18 +275,56 @@ const lastIPFSHash = ref('');
 const lastBlockchainTxHash = ref('');
 const blockchainVerificationVisible = ref(false);
 
+// Messaging State
+const textMessage = ref('');
+const useVoiceInMessage = ref(true);
+const chatScrollRef = ref<HTMLElement | null>(null);
+
+// Local chat history for the messaging screen (transient)
+const chatHistory = ref<Array<{ role: 'user' | 'agent', content: string }>>([]);
+
+// Agent Selection State
+const isAgentSelected = ref(false);
+const loadingAgents = ref(false);
+const availableAgents = ref<any[]>([]);
+const selectedAgentId = ref<number | null>(null);
+
 // Audio recording variables
 let mediaRecorder: MediaRecorder | null = null;
 let audioChunks: Blob[] = [];
 let audioContext: AudioContext | null = null;
-let analyser: AnalyserNode | null = null;
-let silenceTimeout: NodeJS.Timeout | null = null;
-const SILENCE_DURATION = 1000; // 1 second of silence to trigger send
-const SILENCE_THRESHOLD = 30; // Noise level threshold
-let hasSpokenInCurrentMessage = false;
+const recordingStartTime = ref(0);
+const recordingDurationSeconds = ref(0);
+let recordingTimer: any = null;
 
-const agentName = computed(() => appStore.agentName || 'Father');
+const recordingDuration = computed(() => {
+  if (!isRecording.value) return '0:00';
+  const mins = Math.floor(recordingDurationSeconds.value / 60);
+  const secs = recordingDurationSeconds.value % 60;
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+});
+
+const agentName = computed(() => appStore.agentName || 'Loved One');
 const agentInitial = computed(() => agentName.value.charAt(0).toUpperCase());
+
+// Filter history by agent name
+const filteredHistory = computed(() => {
+  if (!isAgentSelected.value) return [];
+  // For now, filter by name match since backend doesn't support ID filtering
+  return history.value.filter(item => 
+    item.name === 'Me' || item.name === agentName.value
+  );
+});
+
+// Watch for chatHistory changes to scroll to bottom
+watch(chatHistory, () => {
+  nextTick(() => {
+    if (chatScrollRef.value) {
+      chatScrollRef.value.scrollTop = chatScrollRef.value.scrollHeight;
+    }
+  });
+}, { deep: true });
+
 const batteryColor = computed(() => {
   if (batteryPercentage.value > 50) return '#67c23a';
   if (batteryPercentage.value > 20) return '#e6a23c';
@@ -206,8 +337,16 @@ const callDurationFormatted = computed(() => {
   return `${mins}:${secs}`;
 });
 
-onMounted(() => {
-  fetchHistory();
+onMounted(async () => {
+  await fetchAgents();
+  // If appStore already has an agent name, we might be able to skip selection
+  // but it's safer to let the user confirm.
+  if (appStore.agentCreated && appStore.agentName) {
+    // Optionally auto-select if only one agent exists
+    if (availableAgents.value.length === 1) {
+      handleSelectAgent(availableAgents.value[0]);
+    }
+  }
 });
 
 onUnmounted(() => {
@@ -215,19 +354,55 @@ onUnmounted(() => {
   stopRecording();
 });
 
+async function fetchAgents() {
+  loadingAgents.value = true;
+  try {
+    const data = await listAgents(appStore.currentUserId);
+    availableAgents.value = data;
+  } catch (e) {
+    console.error('Failed to fetch agents', e);
+    ElMessage.error('Failed to load agents');
+  } finally {
+    loadingAgents.value = false;
+  }
+}
+
+async function handleSelectAgent(agent: any) {
+  try {
+    const res = await selectAgent(agent.id);
+    if (res.success) {
+      appStore.setAgentCreated(agent.name);
+      selectedAgentId.value = agent.id;
+      isAgentSelected.value = true;
+      await fetchHistory();
+    }
+  } catch (e) {
+    console.error('Failed to select agent', e);
+    ElMessage.error('Failed to activate agent');
+  }
+}
+
 async function fetchHistory() {
   try {
     const res = await getChatHistory();
     if(res.history) {
         history.value = res.history.map((msg: any) => ({
         type: (msg.role === 'user' ? 'outgoing' : 'incoming') as 'incoming' | 'outgoing',
-        name: msg.role === 'user' ? 'Me' : agentName.value,
+        name: msg.role === 'user' ? 'Me' : (msg.agent_name || agentName.value),
         timestamp: msg.timestamp,
         duration: '2:30',
         blockchain_tx_hash: msg.blockchain_tx_hash,
         ipfs_hash: msg.ipfs_hash,
         on_chain_timestamp: msg.on_chain_timestamp
         })).reverse();
+        
+        // Populate chatHistory for the messaging screen if empty
+        if (chatHistory.value.length === 0) {
+          chatHistory.value = res.history.map((msg: any) => ({
+            role: msg.role === 'user' ? 'user' : 'agent',
+            content: msg.role === 'user' ? msg.user : msg.agent
+          }));
+        }
     }
   } catch (e) {
     console.error('Failed to fetch history', e);
@@ -241,11 +416,10 @@ function startSimulation() {
 function answerCall() {
   callStatus.value = 'connected';
   startTimer();
-  hasSpokenInCurrentMessage = false;
-  console.log('📞 Call answered - starting recording');
+  console.log('📞 Call answered - waiting for manual recording');
   console.log('🎤 Voice ID:', appStore.voiceId);
   console.log('👤 Agent name:', appStore.agentName);
-  startRecording();
+  // Manual recording mode: start from toggleRecording instead of immediately
   // Simulate battery drain during call
   simulateBatteryDrain();
 }
@@ -254,12 +428,44 @@ function rejectCall() {
   callStatus.value = 'idle';
 }
 
+function backToIdle() {
+  if (callStatus.value === 'connected') {
+    endCall();
+  } else {
+    callStatus.value = 'idle';
+  }
+}
+
 function endCall() {
   callStatus.value = 'idle';
   stopTimer();
+  if (recordingTimer) {
+    clearInterval(recordingTimer);
+    recordingTimer = null;
+  }
+  recordingDurationSeconds.value = 0;
   stopRecording();
   lastMessage.value = '';
   batteryPercentage.value = 100; // Reset battery
+}
+
+function toggleRecording() {
+  if (isRecording.value) {
+    // Stop recording and send
+    if (recordingTimer) {
+      clearInterval(recordingTimer);
+      recordingTimer = null;
+    }
+    sendAudioMessage();
+  } else {
+    // Start recording
+    recordingStartTime.value = Date.now();
+    recordingDurationSeconds.value = 0;
+    recordingTimer = setInterval(() => {
+      recordingDurationSeconds.value = Math.floor((Date.now() - recordingStartTime.value) / 1000);
+    }, 1000);
+    startRecording();
+  }
 }
 
 function startTimer() {
@@ -296,15 +502,6 @@ async function startRecording() {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     console.log('✅ Microphone access granted');
     
-    // Setup audio context for silence detection
-    audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-    analyser = audioContext.createAnalyser();
-    const source = audioContext.createMediaStreamSource(stream);
-    source.connect(analyser);
-    analyser.fftSize = 2048;
-    
-    console.log('🎚️ Audio analyser setup complete');
-    
     // Setup media recorder
     mediaRecorder = new MediaRecorder(stream);
     mediaRecorder.ondataavailable = (event) => {
@@ -312,10 +509,7 @@ async function startRecording() {
     };
     mediaRecorder.start();
     console.log('⏺️ MediaRecorder started');
-    
-    // Start silence detection
-    monitorSilence();
-    console.log('🔍 Silence monitoring started');
+    console.log('🎤 Manual recording mode - click button to stop and send');
     
   } catch (e) {
     console.error('❌ Microphone access error:', e);
@@ -325,6 +519,10 @@ async function startRecording() {
 }
 
 function stopRecording() {
+  if (recordingTimer) {
+    clearInterval(recordingTimer);
+    recordingTimer = null;
+  }
   if (mediaRecorder && mediaRecorder.state !== 'inactive') {
     mediaRecorder.stop();
   }
@@ -332,67 +530,13 @@ function stopRecording() {
     audioContext.close();
   }
   isRecording.value = false;
-  
-  if (silenceTimeout) {
-    clearTimeout(silenceTimeout);
-    silenceTimeout = null;
-  }
-}
-
-function monitorSilence() {
-  if (!analyser || !mediaRecorder) return;
-  
-  const dataArray = new Uint8Array(analyser.frequencyBinCount);
-  analyser.getByteFrequencyData(dataArray);
-  
-  // Calculate average noise level
-  let sum = 0;
-  for (let i = 0; i < dataArray.length; i++) {
-    sum += dataArray[i];
-  }
-  const average = sum / dataArray.length;
-  
-  // Clear previous silence timeout if there's sound
-  if (average > SILENCE_THRESHOLD) {
-    hasSpokenInCurrentMessage = true;
-    if (silenceTimeout) {
-      clearTimeout(silenceTimeout);
-      silenceTimeout = null;
-      console.log('🔊 Audio detected (level:', Math.round(average), '), reset silence timer');
-    }
-  } else {
-    // Start silence timer if not already started
-    if (!silenceTimeout && hasSpokenInCurrentMessage) {
-      console.log('🔇 Silence threshold reached (level:', Math.round(average), '), starting timer for', SILENCE_DURATION, 'ms');
-      silenceTimeout = setTimeout(() => {
-        if (mediaRecorder && mediaRecorder.state === 'recording' && hasSpokenInCurrentMessage) {
-          console.log('⏱️ Silence duration exceeded, sending message...');
-          hasSpokenInCurrentMessage = false;
-          sendAudioMessage();
-        }
-      }, SILENCE_DURATION);
-    }
-  }
-  
-  // Continue monitoring
-  if (isRecording.value) {
-    requestAnimationFrame(monitorSilence);
-  }
-}
-
-function manualSend() {
-  console.log('👆 用户点击发送按钮');
-  if (silenceTimeout) {
-    clearTimeout(silenceTimeout);
-    silenceTimeout = null;
-  }
-  sendAudioMessage();
 }
 
 async function sendAudioMessage() {
   if (!mediaRecorder) return;
   
   isProcessing.value = true;
+  isRecording.value = false; // Reset the recording state immediately so UI updates
   console.log('📤 Preparing to send audio message...');
   
   // Create a promise that resolves when data is available after stopping
@@ -412,10 +556,9 @@ async function sendAudioMessage() {
     console.log('🎵 Audio blob received, size:', audioBlob.size, 'bytes');
     
     if (audioBlob.size < 100) {
-      console.warn('⚠️ Audio blob too small, likely empty. Resuming...');
-      if (callStatus.value === 'connected') {
-        startRecording();
-      }
+      console.warn('⚠️ Audio blob too small, likely empty.');
+      ElMessage.warning('录音太短，请重新录制。');
+      isProcessing.value = false;
       return;
     }
     
@@ -441,42 +584,29 @@ async function sendAudioMessage() {
         lastMessage.value = response.agent_response;
         console.log('💬 Agent says:', response.agent_response);
         
+        // Add to local chat history
+        chatHistory.value.push({ role: 'user', content: response.user_message });
+        chatHistory.value.push({ role: 'agent', content: response.agent_response });
+        
         // Play audio if available
         if (response.audio_url) {
           try {
             console.log('🔊 Playing audio response...');
             const audio = new Audio(response.audio_url);
             audio.onended = () => {
-              console.log('✅ Audio playback finished');
-              // Resume recording after audio playback ends
-              if (callStatus.value === 'connected') {
-                console.log('🎙️ Resuming recording...');
-                startRecording();
-              }
+              console.log('✅ Audio playback finished - ready for manual recording');
             };
             audio.onerror = (err) => {
               console.error('❌ Audio playback error:', err);
               ElMessage.warning('Unable to play agent response audio');
-              // Resume recording anyway
-              if (callStatus.value === 'connected') {
-                startRecording();
-              }
             };
             await audio.play();
           } catch (audioErr) {
             console.error('❌ Failed to play audio:', audioErr);
             ElMessage.warning('Unable to play agent response audio');
-            // Resume recording anyway
-            if (callStatus.value === 'connected') {
-              startRecording();
-            }
           }
         } else {
-          console.log('📝 No audio URL, resuming recording for text-only mode');
-          // No audio, resume recording immediately
-          if (callStatus.value === 'connected') {
-            startRecording();
-          }
+          console.log('📝 No audio URL, fallback to text-only mode.');
         }
       } else {
         console.error('❌ No agent response in backend response');
@@ -486,16 +616,70 @@ async function sendAudioMessage() {
       console.error('❌ API error:', apiErr);
       console.error('Error details:', apiErr.response?.data || apiErr.message);
       ElMessage.error(`Failed to get response: ${apiErr.message || 'Unknown error'}`);
-      // Resume recording on error
-      if (callStatus.value === 'connected' && mediaRecorder) {
-        mediaRecorder.start();
-        monitorSilence();
-      }
     }
     
   } catch (e: any) {
     console.error('❌ Unexpected error:', e);
     ElMessage.error(`Message processing failed: ${e.message}`);
+  } finally {
+    isProcessing.value = false;
+  }
+}
+
+function openMessaging() {
+  if (!isAgentSelected.value) {
+    ElMessage.warning('Please select an agent first');
+    return;
+  }
+  callStatus.value = 'messaging';
+}
+
+async function sendTextReply() {
+  if (!textMessage.value.trim() || isProcessing.value) return;
+  
+  const userContent = textMessage.value;
+  textMessage.value = '';
+  isProcessing.value = true;
+  
+  // Optimistic UI update
+  chatHistory.value.push({ role: 'user', content: userContent });
+  
+  try {
+    const response = await sendTextMessage(userContent, useVoiceInMessage.value);
+    
+    if (response.agent_response) {
+      chatHistory.value.push({ role: 'agent', content: response.agent_response });
+      
+      // If we got an audio response, play it
+      if (response.has_audio && response.audio_data) {
+        try {
+          const binaryString = atob(response.audio_data);
+          const bytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+          const audioBlob = new Blob([bytes], { type: 'audio/mp3' });
+          const audioUrl = URL.createObjectURL(audioBlob);
+          const audio = new Audio(audioUrl);
+          await audio.play();
+        } catch (audioErr) {
+          console.error('Failed to play audio response:', audioErr);
+        }
+      }
+      
+      // Update blockchain/IPFS status if available
+      if (response.ipfs_hash) lastIPFSHash.value = response.ipfs_hash;
+      if (response.blockchain_tx_hash) {
+        lastBlockchainTxHash.value = response.blockchain_tx_hash;
+        blockchainVerificationVisible.value = true;
+      }
+      
+      // Refresh global history
+      await fetchHistory();
+    }
+  } catch (e: any) {
+    console.error('Failed to send text message:', e);
+    ElMessage.error(`Failed to send message: ${e.message}`);
   } finally {
     isProcessing.value = false;
   }
@@ -519,6 +703,107 @@ function simulateBatteryDrain() {
   display: flex;
   height: 100%;
   gap: 40px;
+  position: relative;
+}
+
+.back-nav {
+  position: absolute;
+  top: 45px;
+  left: 20px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  color: #409eff;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 5px 10px;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 20px;
+  backdrop-filter: blur(5px);
+  
+  &:hover {
+    background: white;
+  }
+}
+
+.agent-selection-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.9);
+  z-index: 100;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  backdrop-filter: blur(5px);
+
+  .selection-card {
+    width: 500px;
+    background: white;
+    padding: 40px;
+    border-radius: 16px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    text-align: center;
+
+    h2 { margin-top: 0; color: #303133; }
+    p { color: #909399; margin-bottom: 30px; }
+
+    .agent-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      max-height: 400px;
+      overflow-y: auto;
+      padding: 5px;
+    }
+
+    .agent-select-item {
+      display: flex;
+      align-items: center;
+      padding: 15px 20px;
+      background: #f9fafc;
+      border: 1px solid #ebeef5;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+
+      &:hover {
+        border-color: #409eff;
+        background: #f0f7ff;
+        transform: translateX(5px);
+      }
+
+      .agent-avatar {
+        width: 45px;
+        height: 45px;
+        background: #409eff;
+        color: white;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 18px;
+        margin-right: 15px;
+      }
+
+      .agent-info {
+        flex: 1;
+        text-align: left;
+        display: flex;
+        flex-direction: column;
+
+        .name { font-weight: 600; color: #303133; font-size: 16px; }
+        .relation { font-size: 13px; color: #909399; }
+      }
+
+      .arrow-icon { color: #c0c4cc; }
+    }
+  }
 }
 
 .call-history-section {
@@ -536,7 +821,17 @@ function simulateBatteryDrain() {
     padding-bottom: 10px;
     border-bottom: 1px solid #eee;
 
-    h3 { margin: 0; color: #333; }
+    .header-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      h3 { margin: 0; color: #333; }
+    }
+    
+    .header-actions {
+      display: flex;
+      gap: 10px;
+    }
   }
 
   .history-item {
@@ -738,6 +1033,157 @@ function simulateBatteryDrain() {
       p { color: rgba(255,255,255,0.7); margin-top: 10px; font-size: 18px; }
     }
   }
+
+  &.messaging {
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    background: #f5f5f5;
+
+    .chat-header {
+      padding: 50px 15px 10px;
+      background: #f5f5f5;
+      border-bottom: 1px solid #e0e0e0;
+      text-align: center;
+
+      .header-info {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 5px;
+
+        .mini-avatar {
+          width: 30px;
+          height: 30px;
+          background: #409eff;
+          color: white;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 14px;
+          font-weight: 600;
+        }
+
+        .chat-name {
+          font-size: 14px;
+          font-weight: 500;
+          color: #333;
+        }
+      }
+    }
+
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 15px;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      scrollbar-width: none;
+      &::-webkit-scrollbar { display: none; }
+
+      .chat-bubble-wrapper {
+        display: flex;
+        width: 100%;
+
+        &.user {
+          justify-content: flex-end;
+          .chat-bubble {
+            background: #95ec69;
+            color: #000;
+            border-radius: 6px 2px 6px 6px;
+            &::after {
+              content: '';
+              position: absolute;
+              right: -5px;
+              top: 8px;
+              border-width: 5px 0 5px 5px;
+              border-style: solid;
+              border-color: transparent transparent transparent #95ec69;
+            }
+          }
+        }
+
+        &.agent {
+          justify-content: flex-start;
+          .chat-bubble {
+            background: #fff;
+            color: #000;
+            border-radius: 2px 6px 6px 6px;
+            &::after {
+              content: '';
+              position: absolute;
+              left: -5px;
+              top: 8px;
+              border-width: 5px 5px 5px 0;
+              border-style: solid;
+              border-color: transparent #fff transparent transparent;
+            }
+          }
+        }
+
+        .chat-bubble {
+          max-width: 80%;
+          padding: 8px 12px;
+          font-size: 14px;
+          position: relative;
+          word-break: break-word;
+          box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+
+          &.typing {
+            padding: 8px 15px;
+            .dot {
+              animation: blink 1s infinite;
+              &:nth-child(2) { animation-delay: 0.2s; }
+              &:nth-child(3) { animation-delay: 0.4s; }
+            }
+          }
+        }
+      }
+    }
+
+    .chat-input-wrapper {
+      padding: 10px 15px 30px;
+      background: #f7f7f7;
+      border-top: 1px solid #e0e0e0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+
+      .voice-toggle {
+        font-size: 20px;
+        color: #666;
+        cursor: pointer;
+        display: flex;
+        
+        .active { color: #409eff; }
+      }
+
+      input {
+        flex: 1;
+        border: none;
+        background: #fff;
+        padding: 8px 12px;
+        border-radius: 4px;
+        font-size: 14px;
+        outline: none;
+      }
+
+      .send-icon {
+        font-size: 20px;
+        color: #07c160;
+        cursor: pointer;
+        &.disabled { color: #ccc; cursor: not-allowed; }
+      }
+    }
+  }
+}
+
+@keyframes blink {
+  0% { opacity: 0.2; }
+  50% { opacity: 1; }
+  100% { opacity: 0.2; }
 }
 
 .actions, .call-actions {
@@ -882,5 +1328,15 @@ function simulateBatteryDrain() {
 @keyframes bounce {
   0%, 100% { transform: scaleY(0.4); }
   50% { transform: scaleY(1); }
+}
+
+@keyframes pulse-ring {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 59, 48, 0.7); }
+  70% { transform: scale(1); box-shadow: 0 0 0 15px rgba(255, 59, 48, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 59, 48, 0); }
+}
+
+.recording-pulse {
+  animation: pulse-ring 1.5s infinite;
 }
 </style>

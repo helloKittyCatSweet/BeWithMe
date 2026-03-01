@@ -27,6 +27,10 @@ Built for the [NVIDIA Mistral Worldwide Hackathon 2026](https://worldwide-hackat
 
 ## 🏗️ System Architecture
 
+![BeWithMe Architecture](docs/architecture.svg)
+
+*Figure 1: BeWithMe System Technical Architecture. Illustrates the end-to-end flow from frontend interaction to the Mistral backend engine, Google Colab fine-tuning, and blockchain-based ownership verification.*
+
 ```mermaid
 graph TD
     subgraph Frontend [User Interface - Streamlit]

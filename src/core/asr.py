@@ -209,8 +209,9 @@ class GradioWhisperASR:
     def __init__(self):
         """初始化 Gradio 客户端"""
         try:
-            from gradio_client import Client
-            self.client = Client("openai/whisper")
+            from gradio_client import Client, handle_file
+            self.client = Client("BalashovIlya/whisper-transcriber")
+            self.handle_file = handle_file
             logger.info("✅ Gradio Whisper API 客户端初始化成功")
         except ImportError:
             logger.error("❌ gradio_client 未安装，请运行: pip install gradio_client")
@@ -240,10 +241,9 @@ class GradioWhisperASR:
             logger.info(f"🌐 调用 Gradio Whisper API...")
             logger.info(f"📁 音频文件: {audio_path}")
             
-            # 调用 Gradio API，task="transcribe" 为转录模式
+            # 调用 Gradio API，使用 handle_file 处理文件
             result = self.client.predict(
-                inputs=audio_path,
-                task="transcribe",
+                audio_file=self.handle_file(audio_path),
                 api_name="/predict"
             )
             
@@ -264,3 +264,51 @@ class GradioWhisperASR:
         """提取语音模式（不支持）"""
         logger.warning("⚠️ Gradio Whisper API 不支持语音模式提取")
         return []
+class LocalFasterWhisperASR:
+    """本地 faster-whisper 音频识别引擎"""
+    def __init__(self, model_size="tiny"):
+        """
+        初始化本地 ASR 引擎
+        model_size: 对于普通设备/无显卡，建议用 'tiny' 或 'base'
+        """
+        try:
+            from faster_whisper import WhisperModel
+        except ImportError:
+            raise ImportError("需要安装 faster-whisper: pip install faster-whisper")
+        
+        logger.info(f"🖥️ 加载本地 Faster-Whisper 模型: {model_size}...")
+        # device="cpu" 强制使用 CPU
+        # compute_type="int8" 进一步压缩计算量，适合低配 CPU
+        self.model = WhisperModel(model_size, device="cpu", compute_type="int8")
+        logger.info("✅ 本地 Faster-Whisper 模型加载成功")
+
+    def transcribe_audio(
+        self, 
+        audio_path: str,
+        language: str = "zh",
+        return_timestamps: bool = False
+    ) -> Optional[Dict]:
+        """
+        转录音频文件
+        """
+        import os
+        if not os.path.exists(audio_path):
+            logger.error(f"❌ 找不到音频文件: {audio_path}")
+            return None
+        
+        try:
+            # beam_size=5 是精度与速度的平衡
+            logger.info("🖥️ 开始本地 Faster-Whisper ASR 识别...")
+            segments, info = self.model.transcribe(audio_path, beam_size=5)
+            text = "".join([segment.text for segment in segments])
+            
+            logger.info(f"✅ ASR 识别成功: {text}")
+            
+            return {
+                "text": text.strip(),
+                "language": info.language,
+                "segments": [{"text": text}] # 简化时间戳支持
+            }
+        except Exception as e:
+            logger.error(f"❌ 本地 ASR 识别失败: {str(e)}")
+            return None

@@ -18,8 +18,8 @@ from ...core.voice_cloning import VoiceCloner
 from ...core.asr import analyze_voice_sample, transcribe_audio
 from ...core.conversation import ConversationAgent
 from ...core.ipfs_service import get_ipfs_service
-from ...config import PINATA_API_KEY, PINATA_SECRET_KEY, IPFS_ENABLED
-from ..models import VoiceInfo, CloneVoiceResponse
+from ...config import PINATA_API_KEY, PINATA_SECRET_API_KEY, IPFS_ENABLED
+from ..models import VoiceInfo, CloneVoiceResponse, VoiceProfileResponse
 from ...database import (
     get_db, 
     check_relationship_valid, 
@@ -85,13 +85,13 @@ def _extract_audio_from_mp4(input_path: str) -> str:
         raise HTTPException(status_code=400, detail="MP4 文件音轨提取失败，请确认文件包含可用音频")
 
 
-@router.get("/list", response_model=List[VoiceInfo])
+@router.get("/profiles", response_model=List[VoiceProfileResponse])
 async def list_voice_profiles(
-    user_id: int,
+    user_id: int = 1,
     db: Session = Depends(get_db)
 ):
     """
-    获取用户的所有音色档案
+    获取用户的所有音色档案（仅数据库中的）
     """
     profiles = get_user_voice_profiles(db, user_id)
     return profiles
@@ -177,7 +177,7 @@ async def clone_voice(
         ipfs_gateway_url = None
         ipfs_uploaded_at = None
         
-        if IPFS_ENABLED and PINATA_API_KEY and PINATA_SECRET_KEY:
+        if IPFS_ENABLED and PINATA_API_KEY and PINATA_SECRET_API_KEY:
             try:
                 logger.info(f"Uploading audio to IPFS via Pinata...")
                 ipfs_service = get_ipfs_service()
@@ -268,16 +268,35 @@ async def clone_voice(
 
 
 @router.get("/list", response_model=dict)
-async def list_voices():
-    """获取所有可用音色"""
+async def list_voices(user_id: int = 1, db: Session = Depends(get_db)):
+    """获取所有可用音色（系统声音 + 用户上传的声音）"""
     try:
-        voices = voice_cloner.get_all_voices()
+        # 获取系统声音（ElevenLabs + XTTS）
+        system_voices = voice_cloner.get_all_voices()
+        
+        # 获取用户上传的声音档案
+        user_profiles = get_user_voice_profiles(db, user_id)
+        user_voices = [
+            {
+                "voice_id": p.voice_id,
+                "name": p.name,
+                "description": p.description,
+                "labels": {"source": "user"},
+                "category": "cloned"
+            }
+            for p in user_profiles
+        ]
+        
+        # 合并所有声音
+        all_voices = system_voices + user_voices
+        
         return {
             "success": True,
-            "count": len(voices),
-            "voices": voices
+            "count": len(all_voices),
+            "voices": all_voices
         }
     except Exception as e:
+        logger.error(f"获取声音列表失败: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

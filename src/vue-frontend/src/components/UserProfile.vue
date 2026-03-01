@@ -1,7 +1,7 @@
 <template>
   <div class="user-profile">
     <div class="header">
-      <h2>👤 My Data Dashboard</h2>
+      <h2>My Data Dashboard</h2>
       <p class="subtitle">Manage your loved ones, voices, and blockchain-verified records.</p>
     </div>
 
@@ -12,13 +12,16 @@
           <template #header>
             <div class="card-header">
               <span>👪 My Family Members</span>
-              <el-button text @click="loadData" :icon="Refresh">Refresh</el-button>
+              <div class="header-actions">
+                <el-button type="primary" size="small" :icon="Plus" @click="goToVerification">Add Parents</el-button>
+                <el-button text @click="loadData" :icon="Refresh">Refresh</el-button>
+              </div>
             </div>
           </template>
           
           <div v-if="relationships.length === 0" class="empty-list">
             <el-empty description="No family members added yet">
-              <el-button type="primary" @click="$router.push('/')">Add Family Member</el-button>
+              <el-button type="primary" @click="goToVerification">Add Parents</el-button>
             </el-empty>
           </div>
           
@@ -56,7 +59,7 @@
                 
                 <!-- Voice Status -->
                 <div class="info-row" style="margin-top: 10px;">
-                  <span class="label">🎤 Voice:</span>
+                  <span class="label">Voice:</span>
                   <span class="value">
                     <el-tag v-if="hasVoice(member)" type="success" size="small">Available</el-tag>
                     <el-tag v-else type="info" size="small">Not cloned yet</el-tag>
@@ -79,13 +82,13 @@
                   <el-alert type="success" :closable="false" style="margin-top: 10px;">
                     <template #title>
                       <div style="font-size: 12px;">
-                        <strong>🔐 Immutable Proof</strong>
+                        <strong>Immutable Proof</strong>
                       </div>
                     </template>
                     <div style="font-size: 11px; margin-top: 5px;">
-                      <div>📝 IPFS: <code style="font-size: 10px;">{{ member.on_chain_ipfs_hash?.slice(0, 20) }}...</code></div>
+                      <div>IPFS: <code style="font-size: 10px;">{{ member.on_chain_ipfs_hash?.slice(0, 20) }}...</code></div>
                       <div v-if="member.blockchain_tx_hash">
-                        🔗 Tx: <code style="font-size: 10px;">{{ member.blockchain_tx_hash.slice(0, 15) }}...</code>
+                        Tx: <code style="font-size: 10px;">{{ member.blockchain_tx_hash.slice(0, 15) }}...</code>
                       </div>
                       <div style="margin-top: 5px; color: #67c23a;">
                         ✓ Permanent record that cannot be altered or deleted
@@ -137,7 +140,7 @@
         <el-card shadow="hover" class="profile-card">
           <template #header>
             <div class="card-header">
-              <span>⚙️ Account Settings</span>
+              <span>Account Settings</span>
             </div>
           </template>
 
@@ -169,7 +172,7 @@
         <el-card shadow="hover" class="profile-card">
           <template #header>
             <div class="card-header">
-              <span>📊 Statistics</span>
+              <span>Statistics</span>
             </div>
           </template>
           
@@ -214,29 +217,32 @@
 
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
+import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
-import { Wallet, CopyDocument, TopRight, Refresh, VideoPlay, Select } from '@element-plus/icons-vue';
+import { Wallet, CopyDocument, TopRight, Refresh, VideoPlay, Select, Plus } from '@element-plus/icons-vue';
 import { listRelationships, listVoiceProfiles } from '@/services/api';
 import { useAppStore } from '@/stores/app';
 import { CONTRACT_ADDRESS, connectWallet } from '@/services/contract';
 
+const router = useRouter();
 const appStore = useAppStore();
 const relationships = ref<any[]>([]);
 const voiceProfiles = ref<any[]>([]);
 
 // Computed statistics
 const approvedCount = computed(() => 
-  relationships.value.filter(r => r.verification_status === 'approved').length
+  Array.isArray(relationships.value) ? relationships.value.filter(r => r.verification_status === 'approved').length : 0
 );
 
 const voiceCount = computed(() => 
-  voiceProfiles.value.length
+  Array.isArray(voiceProfiles.value) ? voiceProfiles.value.length : 0
 );
 
-const onChainCount = computed(() => 
-  relationships.value.filter(r => isOnChain(r)).length + 
-  voiceProfiles.value.filter(v => v.blockchain_minted).length
-);
+const onChainCount = computed(() => {
+  if (!Array.isArray(relationships.value) || !Array.isArray(voiceProfiles.value)) return 0;
+  return relationships.value.filter(r => isOnChain(r)).length + 
+         voiceProfiles.value.filter(v => v.blockchain_minted).length;
+});
 
 onMounted(() => {
   if (appStore.currentUserId) {
@@ -258,6 +264,10 @@ async function loadData() {
     console.error('Failed to load user profile data:', error);
     ElMessage.error('Failed to load profile data');
   }
+}
+
+function goToVerification() {
+  router.push('/verification');
 }
 
 function hasVoice(member: any) {
@@ -353,6 +363,12 @@ function copyToClipboard(text: string | null) {
     justify-content: space-between;
     align-items: center;
     font-weight: 600;
+    
+    .header-actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
   }
   
   .empty-list {

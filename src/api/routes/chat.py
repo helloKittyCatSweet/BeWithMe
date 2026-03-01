@@ -11,9 +11,9 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 
 from ...core.conversation import ConversationAgent
-from ...core.asr import WhisperASR, GradioWhisperASR
+from ...core.asr import WhisperASR, GradioWhisperASR, LocalFasterWhisperASR
 from ...core.voice_cloning import VoiceCloner
-from ...core.ipfs_service import IPFSService
+from ...core.ipfs_service import PinataIPFSService as IPFSService
 from ...core.blockchain_service import get_blockchain_service
 from ..models import ChatRequest, ChatResponse
 from ...database.connection import get_db
@@ -56,8 +56,8 @@ def get_asr_engine():
                 logger.info("🌐 使用 Gradio Whisper API")
                 asr_engine = GradioWhisperASR()
             else:
-                logger.info("🖥️ 使用本地 Whisper 模型")
-                asr_engine = WhisperASR()
+                logger.info("🖥️ 使用本地 Faster-Whisper 模型")
+                asr_engine = LocalFasterWhisperASR(model_size="tiny")
         except ImportError as e:
             logger.error(f"❌ ASR 初始化失败: {str(e)}")
             raise HTTPException(status_code=500, detail="语音识别服务未就绪")
@@ -137,33 +137,78 @@ async def save_call_to_ipfs_and_blockchain(
 @router.post("/text", response_model=ChatResponse)
 async def chat_text(request: ChatRequest):
     """
-    文字对话（不使用语音）
+    文字对话
     
     - **message**: 用户消息
+    - **use_voice**: 是否生成语音回复（可选）
     """
-    global current_agent
+    global current_agent, current_voice_id
     
     if not current_agent:
         raise HTTPException(status_code=400, detail="请先创建对话代理")
     
     try:
-        response = current_agent.generate_response(
+        # 1. 生成回复
+        response_text = current_agent.generate_response(
             request.message, 
             stream=False
         )
         
-        # 安全检查
-        is_safe, filtered_response = current_agent.check_safety(response)
+        # 2. 安全检查
+        is_safe, filtered_response = current_agent.check_safety(response_text)
+        
+        # 3. 处理语音回复
+        audio_data_base64 = None
+        has_audio = False
+        
+        # 如果请求要求语音，且有 voice_id
+        if request.use_voice and current_voice_id:
+            logger.info(f"🔊 准备为文字请求合成语音 (voice_id: {current_voice_id})...")
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_output:
+                output_path = tmp_output.name
+            
+            audio_result = voice_cloner.generate_speech(
+                filtered_response,
+                current_voice_id,
+                output_path
+            )
+            
+            if audio_result:
+                import base64
+                with open(audio_result, 'rb') as f:
+                    audio_data = f.read()
+                audio_data_base64 = base64.b64encode(audio_data).decode('utf-8')
+                has_audio = True
+                
+                # 清理临时文件
+                if os.path.exists(output_path):
+                    os.unlink(output_path)
+        
+        # 4. 保存到IPFS和区块链
+        agent_name = current_agent.profile.name if current_agent and hasattr(current_agent, 'profile') else "AI Companion"
+        blockchain_info = await save_call_to_ipfs_and_blockchain(
+            audio_blob=None, # 文字对话暂不保存音频Blob到IPFS元数据
+            user_text=request.message,
+            agent_response=filtered_response,
+            agent_name=agent_name
+        )
         
         return ChatResponse(
             success=True,
             user_message=request.message,
             agent_response=filtered_response,
-            is_safe=is_safe
+            is_safe=is_safe,
+            has_audio=has_audio,
+            audio_data=audio_data_base64,
+            audio_format="mp3" if has_audio else None,
+            ipfs_hash=blockchain_info.get("ipfs_hash"),
+            blockchain_tx_hash=blockchain_info.get("blockchain_tx_hash")
         )
         
     except Exception as e:
-        logger.error(f"对话生成失败: {str(e)}")
+        logger.error(f"文字对话生成失败: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -203,7 +248,8 @@ async def chat_voice(audio_file: UploadFile = File(...)):
         # 2. ASR 转录
         logger.info("🎙️ 开始转录用户语音...")
         asr = get_asr_engine()
-        transcription = asr.transcribe_audio(user_audio_path, language="zh")
+        # Set language to None for auto-detection or 'en' for fixed English
+        transcription = asr.transcribe_audio(user_audio_path, language=None)
         
         logger.info(f"📝 ASR响应: {transcription}")
         

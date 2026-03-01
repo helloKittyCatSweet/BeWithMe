@@ -14,7 +14,9 @@ from ...database import (
     get_db, 
     log_action, 
     get_agent_profile,
-    get_user_agent_profiles
+    get_user_agent_profiles,
+    create_agent_profile,
+    get_agent_profile_by_id
 )
 from ..auth import get_current_user
 
@@ -25,10 +27,64 @@ router = APIRouter(prefix="/agent", tags=["agent"])
 current_agent: Optional[ConversationAgent] = None
 
 
+@router.get("/list")
+async def list_agents(
+    user_id: int,
+    db: Session = Depends(get_db)
+):
+    """获取用户的所有对话代理"""
+    profiles = get_user_agent_profiles(db, user_id)
+    return profiles
+
+
+@router.post("/select/{profile_id}")
+async def select_agent(
+    profile_id: int,
+    db: Session = Depends(get_db)
+):
+    """通过 ID 选择并激活一个对话代理"""
+    global current_agent
+    
+    profile = get_agent_profile_by_id(db, profile_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="代理档案不存在")
+    
+    try:
+        agent = create_custom_agent(
+            name=profile.name,
+            relationship=profile.relationship_type,  # 使用 relationship_type
+            traits=profile.personality,              # 使用 personality
+            patterns=profile.speech_patterns or []
+        )
+        
+        # 如果有关联的声音，这里也可以设置
+        # 注意：目前的 AgentProfile 模型可能没有 voice_id 字段，
+        # 如果需要，可以从 VoiceProfile 中根据 relationship_id 查找
+        
+        current_agent = agent
+        
+        # 同时设置到 chat 路由中
+        from . import chat
+        chat.current_agent = agent
+        
+        return {
+            "success": True, 
+            "message": f"代理 '{profile.name}' 已激活",
+            "name": profile.name
+        }
+    except Exception as e:
+        logger.error(f"激活代理时出错: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/create", response_model=CreateAgentResponse)
-async def create_agent(profile: ProfileRequest):
+async def create_agent(
+    profile: ProfileRequest,
+    user_id: int = 1,
+    db: Session = Depends(get_db)
+):
     """
-    创建对话代理
+    创建对话代理并保存到数据库
     
     - **name**: 亲人姓名
     - **relationship**: 关系（如：奶奶、爷爷、妈妈）
@@ -39,6 +95,7 @@ async def create_agent(profile: ProfileRequest):
     global current_agent
     
     try:
+        # 创建内存中的 agent 对象
         agent = create_custom_agent(
             name=profile.name,
             relationship=profile.relationship,
@@ -50,6 +107,19 @@ async def create_agent(profile: ProfileRequest):
         if profile.voice_id:
             agent.voice_id = profile.voice_id
         
+        # **保存到数据库**
+        db_profile = create_agent_profile(
+            db=db,
+            user_id=user_id,
+            name=profile.name,
+            relationship=profile.relationship,
+            personality_traits=profile.personality_traits,
+            speech_patterns=profile.speech_patterns
+        )
+        
+        logger.info(f"✅ 代理 '{profile.name}' 已保存到数据库 (ID: {db_profile.id})")
+        
+        # 设置为当前活跃的 agent
         current_agent = agent
         
         # 同时设置到 chat 路由中
@@ -60,8 +130,9 @@ async def create_agent(profile: ProfileRequest):
         
         return CreateAgentResponse(
             success=True,
-            message=f"对话代理 '{profile.name}' 创建成功！",
+            message=f"对话代理 '{profile.name}' 创建成功并已保存！",
             profile={
+                "id": db_profile.id,
                 "name": profile.name,
                 "relationship": profile.relationship,
                 "personality": profile.personality_traits,

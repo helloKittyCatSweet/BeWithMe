@@ -1,8 +1,8 @@
 <template>
   <div class="family-verification">
     <div class="header">
-      <h2>👪 Step 0: Family Relationship Verification</h2>
-      <p class="subtitle">🛡️ Ethical Protection: Please declare your relationship and upload verification documents.</p>
+      <h2>Family Relationship Verification</h2>
+      <p class="subtitle">Ethical Protection: Please declare your relationship and upload verification documents.</p>
     </div>
 
     <el-alert
@@ -29,7 +29,7 @@
     <!-- Main Action Button -->
     <div style="text-align: center; margin: 30px 0;">
       <el-button type="primary" size="large" @click="showDialog = true">
-        📝 Start Verification Process
+        Start Verification Process
       </el-button>
     </div>
 
@@ -119,7 +119,7 @@
         <div class="upload-section">
           <div style="margin-bottom: 15px;">
             <el-button type="primary" @click="handleFileSelect">
-              📁 Browse and Select Files
+              Browse and Select Files
             </el-button>
             <el-button @click="clearFileSelection">Clear</el-button>
           </div>
@@ -176,7 +176,7 @@
         <el-card shadow="hover" style="margin-top: 20px;">
           <template #header>
             <div class="card-header">
-              <span>📋 Your Relationship Records</span>
+              <span>Your Relationship Records</span>
             </div>
           </template>
           
@@ -208,7 +208,7 @@
                   size="small"
                   @click="editRelationship(item)"
                 >
-                  📝 Upload Docs
+                  Upload Docs
                 </el-button>
               </div>
             </div>
@@ -221,7 +221,7 @@
         <el-card shadow="hover">
           <template #header>
             <div class="card-header">
-              <span>ℹ️ Process Info</span>
+              <span>Process Info</span>
             </div>
           </template>
           <div class="info-content">
