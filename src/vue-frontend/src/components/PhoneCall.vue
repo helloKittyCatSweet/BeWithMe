@@ -19,7 +19,7 @@
               <div class="caller-name">
                 {{ call.name || 'Unknown' }}
                 <el-tag v-if="call.blockchain_tx_hash" type="success" size="small" effect="plain" style="margin-left: 8px;">
-                  ⛓️ On-Chain
+                  On-Chain
                 </el-tag>
               </div>
               <div class="call-time">{{ call.timestamp ? formatTime(call.timestamp) : 'Unknown time' }}</div>
@@ -53,7 +53,9 @@
               <span>9:41</span>
               <div class="status-icons">
                 <el-icon><Connection /></el-icon>
-                <el-icon><Battery /></el-icon>
+                <div class="battery-indicator">
+                  <el-progress :percentage="batteryPercentage" :color="batteryColor" :show-text="false" style="width: 50px; margin: 0 4px;"></el-progress>
+                </div>
               </div>
             </div>
             <div class="contact-info">
@@ -114,14 +116,30 @@
                "{{ lastMessage }}"
             </div>
 
+            <!-- Blockchain Verification Info -->
+            <div class="blockchain-verification" v-if="blockchainVerificationVisible">
+              <div class="verification-item" v-if="lastIPFSHash">
+                <span class="label">📦 IPFS:</span>
+                <span class="hash">{{ lastIPFSHash.substring(0, 16) }}...</span>
+              </div>
+              <div class="verification-item" v-if="lastBlockchainTxHash">
+                <span class="label">⛓️ Chain:</span>
+                <a :href="`https://sepolia.etherscan.io/tx/${lastBlockchainTxHash}`" target="_blank" class="chain-link">
+                  {{ lastBlockchainTxHash.substring(0, 10) }}...
+                </a>
+              </div>
+            </div>
+
             <div class="call-controls">
               <div class="control-row">
-                <div class="control-btn"><el-icon><Microphone /></el-icon></div>
-                <div class="control-btn"><el-icon><VideoCamera /></el-icon></div>
-                <div class="control-btn"><el-icon><Mute /></el-icon></div>
+                <div class="control-btn" title="静音"><el-icon><Mute /></el-icon></div>
+                <div class="btn-circle blue big" @click="manualSend" :disabled="!isRecording || isProcessing" title="说完了，点击发送">
+                  <el-icon><PhoneFilled /></el-icon>
+                </div>
+                <div class="control-btn" title="扬声器"><el-icon><VideoCamera /></el-icon></div>
               </div>
               <div class="control-row end-call">
-                <div class="btn-circle red big" @click="endCall">
+                <div class="btn-circle red big" @click="endCall" title="挂断电话">
                   <el-icon><PhoneFilled /></el-icon>
                 </div>
               </div>
@@ -137,7 +155,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useAppStore } from '@/stores/app';
-import { getChatHistory } from '@/services/api'; // Using chat history as call logs for now
+import { getChatHistory, sendVoiceMessage } from '@/services/api';
 import { Phone, PhoneFilled, Connection, Message, Microphone, VideoCamera, Mute } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
 
@@ -157,9 +175,30 @@ const callStatus = ref<'idle' | 'incoming' | 'connected'>('idle');
 const callDuration = ref(0);
 const timer = ref<any>(null);
 const lastMessage = ref('');
+const isRecording = ref(false);
+const isProcessing = ref(false);
+const batteryPercentage = ref(100);
+const lastIPFSHash = ref('');
+const lastBlockchainTxHash = ref('');
+const blockchainVerificationVisible = ref(false);
+
+// Audio recording variables
+let mediaRecorder: MediaRecorder | null = null;
+let audioChunks: Blob[] = [];
+let audioContext: AudioContext | null = null;
+let analyser: AnalyserNode | null = null;
+let silenceTimeout: NodeJS.Timeout | null = null;
+const SILENCE_DURATION = 1000; // 1 second of silence to trigger send
+const SILENCE_THRESHOLD = 30; // Noise level threshold
+let hasSpokenInCurrentMessage = false;
 
 const agentName = computed(() => appStore.agentName || 'Father');
 const agentInitial = computed(() => agentName.value.charAt(0).toUpperCase());
+const batteryColor = computed(() => {
+  if (batteryPercentage.value > 50) return '#67c23a';
+  if (batteryPercentage.value > 20) return '#e6a23c';
+  return '#f56c6c';
+});
 
 const callDurationFormatted = computed(() => {
   const mins = Math.floor(callDuration.value / 60).toString().padStart(2, '0');
@@ -173,19 +212,18 @@ onMounted(() => {
 
 onUnmounted(() => {
   stopTimer();
+  stopRecording();
 });
 
 async function fetchHistory() {
   try {
     const res = await getChatHistory();
-    // Assuming history structure, mapping it to display format
-    // In a real app, you might have a dedicated /calls endpoint
     if(res.history) {
         history.value = res.history.map((msg: any) => ({
         type: (msg.role === 'user' ? 'outgoing' : 'incoming') as 'incoming' | 'outgoing',
         name: msg.role === 'user' ? 'Me' : agentName.value,
         timestamp: msg.timestamp,
-        duration: '2:30', // Mock duration
+        duration: '2:30',
         blockchain_tx_hash: msg.blockchain_tx_hash,
         ipfs_hash: msg.ipfs_hash,
         on_chain_timestamp: msg.on_chain_timestamp
@@ -197,15 +235,19 @@ async function fetchHistory() {
 }
 
 function startSimulation() {
-  // Simulate outgoing call connecting immediately for demo
-  // Or simulate incoming call for "Pick up" experience requested by user
   callStatus.value = 'incoming';
 }
 
 function answerCall() {
   callStatus.value = 'connected';
   startTimer();
-  simulateConversation();
+  hasSpokenInCurrentMessage = false;
+  console.log('📞 Call answered - starting recording');
+  console.log('🎤 Voice ID:', appStore.voiceId);
+  console.log('👤 Agent name:', appStore.agentName);
+  startRecording();
+  // Simulate battery drain during call
+  simulateBatteryDrain();
 }
 
 function rejectCall() {
@@ -215,7 +257,9 @@ function rejectCall() {
 function endCall() {
   callStatus.value = 'idle';
   stopTimer();
+  stopRecording();
   lastMessage.value = '';
+  batteryPercentage.value = 100; // Reset battery
 }
 
 function startTimer() {
@@ -239,18 +283,233 @@ function formatTime(isoString: string) {
 }
 
 function getBarHeight(index: number) {
-  return 10 + Math.random() * 30; // Mock visualization
+  return 10 + Math.random() * 30;
 }
 
-// Mock conversation flow
-function simulateConversation() {
-  setTimeout(() => {
-    lastMessage.value = "Hello? Is that you?";
-  }, 1500);
+// Audio recording implementation
+async function startRecording() {
+  try {
+    isRecording.value = true;
+    audioChunks = [];
+    console.log('🎙️ Requesting microphone access...');
+    
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    console.log('✅ Microphone access granted');
+    
+    // Setup audio context for silence detection
+    audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    analyser = audioContext.createAnalyser();
+    const source = audioContext.createMediaStreamSource(stream);
+    source.connect(analyser);
+    analyser.fftSize = 2048;
+    
+    console.log('🎚️ Audio analyser setup complete');
+    
+    // Setup media recorder
+    mediaRecorder = new MediaRecorder(stream);
+    mediaRecorder.ondataavailable = (event) => {
+      audioChunks.push(event.data);
+    };
+    mediaRecorder.start();
+    console.log('⏺️ MediaRecorder started');
+    
+    // Start silence detection
+    monitorSilence();
+    console.log('🔍 Silence monitoring started');
+    
+  } catch (e) {
+    console.error('❌ Microphone access error:', e);
+    ElMessage.error('Failed to access microphone - please check permissions');
+    isRecording.value = false;
+  }
+}
+
+function stopRecording() {
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    mediaRecorder.stop();
+  }
+  if (audioContext) {
+    audioContext.close();
+  }
+  isRecording.value = false;
   
-  setTimeout(() => {
-    lastMessage.value = "I've missed you so much...";
-  }, 4000);
+  if (silenceTimeout) {
+    clearTimeout(silenceTimeout);
+    silenceTimeout = null;
+  }
+}
+
+function monitorSilence() {
+  if (!analyser || !mediaRecorder) return;
+  
+  const dataArray = new Uint8Array(analyser.frequencyBinCount);
+  analyser.getByteFrequencyData(dataArray);
+  
+  // Calculate average noise level
+  let sum = 0;
+  for (let i = 0; i < dataArray.length; i++) {
+    sum += dataArray[i];
+  }
+  const average = sum / dataArray.length;
+  
+  // Clear previous silence timeout if there's sound
+  if (average > SILENCE_THRESHOLD) {
+    hasSpokenInCurrentMessage = true;
+    if (silenceTimeout) {
+      clearTimeout(silenceTimeout);
+      silenceTimeout = null;
+      console.log('🔊 Audio detected (level:', Math.round(average), '), reset silence timer');
+    }
+  } else {
+    // Start silence timer if not already started
+    if (!silenceTimeout && hasSpokenInCurrentMessage) {
+      console.log('🔇 Silence threshold reached (level:', Math.round(average), '), starting timer for', SILENCE_DURATION, 'ms');
+      silenceTimeout = setTimeout(() => {
+        if (mediaRecorder && mediaRecorder.state === 'recording' && hasSpokenInCurrentMessage) {
+          console.log('⏱️ Silence duration exceeded, sending message...');
+          hasSpokenInCurrentMessage = false;
+          sendAudioMessage();
+        }
+      }, SILENCE_DURATION);
+    }
+  }
+  
+  // Continue monitoring
+  if (isRecording.value) {
+    requestAnimationFrame(monitorSilence);
+  }
+}
+
+function manualSend() {
+  console.log('👆 用户点击发送按钮');
+  if (silenceTimeout) {
+    clearTimeout(silenceTimeout);
+    silenceTimeout = null;
+  }
+  sendAudioMessage();
+}
+
+async function sendAudioMessage() {
+  if (!mediaRecorder) return;
+  
+  isProcessing.value = true;
+  console.log('📤 Preparing to send audio message...');
+  
+  // Create a promise that resolves when data is available after stopping
+  const waitForData = new Promise<Blob>((resolve) => {
+    mediaRecorder!.ondataavailable = (event) => {
+      resolve(event.data);
+    };
+  });
+
+  // Stop recorder to trigger ondataavailable
+  if (mediaRecorder.state !== 'inactive') {
+    mediaRecorder.stop();
+  }
+  
+  try {
+    const audioBlob = await waitForData;
+    console.log('🎵 Audio blob received, size:', audioBlob.size, 'bytes');
+    
+    if (audioBlob.size < 100) {
+      console.warn('⚠️ Audio blob too small, likely empty. Resuming...');
+      if (callStatus.value === 'connected') {
+        startRecording();
+      }
+      return;
+    }
+    
+    // Send to backend
+    try {
+      console.log('🌐 Sending to backend...');
+      const response = await sendVoiceMessage(audioBlob);
+      
+      console.log('✅ Backend response received:', response);
+      
+      // 保存IPFS和区块链信息
+      if (response.ipfs_hash) {
+        lastIPFSHash.value = response.ipfs_hash;
+        console.log('📦 IPFS Hash:', response.ipfs_hash);
+      }
+      if (response.blockchain_tx_hash) {
+        lastBlockchainTxHash.value = response.blockchain_tx_hash;
+        console.log('⛓️ Blockchain TX Hash:', response.blockchain_tx_hash);
+        blockchainVerificationVisible.value = true;
+      }
+      
+      if (response.agent_response) {
+        lastMessage.value = response.agent_response;
+        console.log('💬 Agent says:', response.agent_response);
+        
+        // Play audio if available
+        if (response.audio_url) {
+          try {
+            console.log('🔊 Playing audio response...');
+            const audio = new Audio(response.audio_url);
+            audio.onended = () => {
+              console.log('✅ Audio playback finished');
+              // Resume recording after audio playback ends
+              if (callStatus.value === 'connected') {
+                console.log('🎙️ Resuming recording...');
+                startRecording();
+              }
+            };
+            audio.onerror = (err) => {
+              console.error('❌ Audio playback error:', err);
+              ElMessage.warning('Unable to play agent response audio');
+              // Resume recording anyway
+              if (callStatus.value === 'connected') {
+                startRecording();
+              }
+            };
+            await audio.play();
+          } catch (audioErr) {
+            console.error('❌ Failed to play audio:', audioErr);
+            ElMessage.warning('Unable to play agent response audio');
+            // Resume recording anyway
+            if (callStatus.value === 'connected') {
+              startRecording();
+            }
+          }
+        } else {
+          console.log('📝 No audio URL, resuming recording for text-only mode');
+          // No audio, resume recording immediately
+          if (callStatus.value === 'connected') {
+            startRecording();
+          }
+        }
+      } else {
+        console.error('❌ No agent response in backend response');
+        ElMessage.error('No response from agent');
+      }
+    } catch (apiErr: any) {
+      console.error('❌ API error:', apiErr);
+      console.error('Error details:', apiErr.response?.data || apiErr.message);
+      ElMessage.error(`Failed to get response: ${apiErr.message || 'Unknown error'}`);
+      // Resume recording on error
+      if (callStatus.value === 'connected' && mediaRecorder) {
+        mediaRecorder.start();
+        monitorSilence();
+      }
+    }
+    
+  } catch (e: any) {
+    console.error('❌ Unexpected error:', e);
+    ElMessage.error(`Message processing failed: ${e.message}`);
+  } finally {
+    isProcessing.value = false;
+  }
+}
+
+function simulateBatteryDrain() {
+  // Drain battery 1% every 30 seconds during call
+  const batteryTimer = setInterval(() => {
+    if (callStatus.value === 'connected' && batteryPercentage.value > 0) {
+      batteryPercentage.value = Math.max(0, batteryPercentage.value - 1);
+    } else {
+      clearInterval(batteryTimer);
+    }
+  }, 30000);
 }
 
 </script>
@@ -428,6 +687,17 @@ function simulateConversation() {
     font-weight: 600;
     color: #333;
     &.white { color: white; }
+
+    .status-icons {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+
+      .battery-indicator {
+        display: flex;
+        align-items: center;
+      }
+    }
   }
 
   &.idle {
@@ -496,6 +766,7 @@ function simulateConversation() {
       &:active { transform: scale(0.95); }
       &.green { background: #4cd964; color: white; }
       &.red { background: #ff3b30; color: white; }
+      &.blue { background: #007aff; color: white; }
       &.grey { background: #e5e5ea; color: #007aff; }
       
       &.big { width: 70px; height: 70px; font-size: 30px; }
@@ -526,6 +797,55 @@ function simulateConversation() {
   text-align: center;
   margin: 0 20px;
   backdrop-filter: blur(10px);
+}
+
+.blockchain-verification {
+  background: rgba(76, 175, 80, 0.15);
+  border-left: 3px solid #4cd964;
+  padding: 12px 15px;
+  border-radius: 8px;
+  font-size: 12px;
+  margin: 10px 20px 0;
+  backdrop-filter: blur(10px);
+
+  .verification-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 5px 0;
+    color: rgba(255,255,255,0.85);
+
+    &:first-child {
+      margin-top: 0;
+    }
+
+    .label {
+      font-weight: 600;
+      width: 40px;
+      flex-shrink: 0;
+    }
+
+    .hash {
+      font-family: monospace;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1;
+      color: #4cd964;
+    }
+
+    .chain-link {
+      font-family: monospace;
+      color: #4cd964;
+      text-decoration: none;
+      cursor: pointer;
+
+      &:hover {
+        text-decoration: underline;
+        color: #67de6d;
+      }
+    }
+  }
 }
 
 .call-controls {

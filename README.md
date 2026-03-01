@@ -1,75 +1,118 @@
 # 🎙️ BeWithMe - AI 情感陪伴与记忆永续系统
 
-**基于 AI 的音色克隆、个性化对话与区块链存证系统**
+**基于 Mistral Large 2、ElevenLabs 与区块链的情感资产数字化平台**
 
-在 [NVIDIA Mistral 全球黑客松 2026](https://worldwide-hackathon.mistral.ai/) 中脱颖而出，BeWithMe 致力于通过前沿 AI 技术，让您可以与思念的亲人进行富有情感的对话，并利用区块链技术确保这些珍贵记忆的永恒与权属。
-
----
-
-## � 黑客松赛道支持
-
-本项目全面覆盖并深度集成了以下赛道：
-
-- ✅ **W&B Fine-Tuning 赛道** - 使用 Mistral 模型进行个性化微调，通过 W&B 追踪实验全过程。
-- ✅ **Mistral Agents 赛道** - 构建具备特定人格特质与说话风格的对话智能体。
-- ✅ **General 赛道** - 融合音色克隆、ASR 与 LLM 的端到端语音交互系统。
-- 🚀 **Web3 扩展** - 创新性地引入区块链技术，解决情感资产的数字所有权与永生命题。
+在 [NVIDIA Mistral 全球黑客松 2026](https://worldwide-hackathon.mistral.ai/) 中，BeWithMe 致力于通过 AI 与 Web3 技术，让您可以与思念的亲人进行富有情感的对话，并确保这些珍贵记忆的永恒与权属。
 
 ---
 
-## ✨ 核心功能
+## 📺 项目演示 (Demo)
+> [!TIP]
+> **演示视频入口**：[点击查看演示视频](#) (即将上线)  
+> **核心 UI 展示**：[查看截图库](docs/screenshots/) (包含手机通话、W&B 监控等)
 
-### 🧠 核心能力
-- 🎤 **即时音色克隆** - 仅需 30 秒音频样例，即可通过 ElevenLabs 实现高度还原的音色克隆。
-- 🤖 **人格特质建模** - 深度刻画亲人的性格特征、口头禅及情感偏好，创建专属 AI 代理。
-- 💬 **自然情感对话** - 由 **Mistral Large 2** 驱动，提供极具共情力且逻辑连贯的对话体验。
-- 🎧 **语音交互 (ASR)** - 集成 OpenAI Whisper，支持流畅的语音输入识别。
+---
 
-### 📊 W&B 深度集成 (Fine-Tuning & Eval)
-- **Weave 追踪**：全程监控每一条对话链路，优化 Prompt 与模型响应。
-- **实验对比**：多版本模型性能直观对比，确保微调效果。
-- **Artifacts 管理**：自动化管理数据集、LoRA 权重与评估报告。
+## 📖 项目简介：BeWithMe 是做什么的？
+
+**BeWithMe** 是一个全栈 AI 情感陪伴系统，旨在利用现代 AI 技术“复刻”亲人的数字形象。它不仅是一个聊天机器人，而是一个集成了**声音、人格、记忆与权属**的闭环系统。
+
+*   **核心痛点**：解决人们对逝去或远方亲人的思念，通过技术手段实现“数字永生”。
+*   **三大阶段**：
+    1.  **复刻 (Replication)**：通过 30 秒音频克隆音色，通过性格描述建模人格。
+    2.  **进化 (Evolution)**：利用 **Google Colab** 强大的算力对 Mistral 模型进行 Fine-tuning，让灵魂更真实。
+    3.  **永续 (Persistence)**：利用区块链进行存证，确保情感数据不因服务商关闭而丢失。
+
+---
+
+## 🏗️ 系统架构图
+
+```mermaid
+graph TD
+    subgraph Frontend [用户前端 - Streamlit]
+        UI[交互界面]
+        AudioRec[语音录制/配置上传]
+    end
+
+    subgraph Backend [逻辑中心 - FastAPI]
+        Brain[Mistral Large 2 - 核心对话引擎]
+        TTS[ElevenLabs - 音色克隆/语音合成]
+        Manager[Config Manager]
+    end
+
+    subgraph Training [微调与进化 - External]
+        Colab[Google Colab - 模型微调训练]
+        WandB[W&B - 训练过程监控]
+        Weave[W&B Weave - 模型对比与效果评估]
+    end
+
+    subgraph Web3 [情感存证 - Blockchain]
+        Contract[Solidity - MemoryLock 合约]
+        Chain[Ethereum Sepolia]
+    end
+
+    UI --> AudioRec
+    AudioRec --> Brain
+    Brain --> TTS
+    TTS --> UI
+
+    Brain -.-> Weave
+    Colab --> WandB
+    WandB -.-> Brain
+    
+    Brain -.-> Contract
+    Contract --> Chain
+```
+
+---
+
+## 🛠️ 技术栈 (Tech Stack)
+
+| 模块 | 技术选型 | 作用 |
+| :--- | :--- | :--- |
+| **LLM (大脑)** | **Mistral Large 2** | 核心对话引擎，负责逻辑生成与情感理解 |
+| **音色克隆 (嗓音)** | **ElevenLabs API** | 30秒快速克隆，生成极具还原度的语音回复 |
+| **微调算力** | **Google Colab** | 提供强大的 GPU 算力进行模型 Fine-tuning |
+| **微调监控** | **W&B (Weights & Biases)** | 实时监控微调实验过程中的各项指标 |
+| **效果评估** | **W&B Weave** | 用于多版本模型的效果对比与性能评估 |
+| **后端框架** | **FastAPI** | 高性能异步 Python 框架，处理所有核心业务流 |
+| **前端 UI** | **Streamlit** | 响应式 Web 界面，提供沉浸式交互体验 |
+| **存证 (权属)** | **Solidity + Sepolia** | 智能合约管理 IPFS 哈希，实现情感资产确权 |
+
+---
+
+## ✨ 核心亮点
+
+### 1. 深度微调与 W&B 实验对比 (Fine-Tuning & Eval)
+我们利用 **Google Colab** 对 Mistral 模型进行深度微调。通过 **W&B** 实时监控训练指标，并使用 **W&B Weave** 进行多维度评估：
+- **Latency (延迟)**：优化响应速度，实现实时通话体验。
+- **Empathy (共情度)**：评估 AI 回复是否具备情感慰藉能力。
+- **Human Likeness (拟人度)**：确保口吻、语速与特定亲人高度一致。
 
 ![W&B 模型对比](docs/w&b_comparasion.png)
 
-### ⛓️ 区块链存证 (MemoryLock)
-- **去中心化存储**：利用 IPFS/Arweave 存储原始素材哈希，确保记忆不因服务商关闭而丢失。
-- **数字所有权 (NFT/SFT)**：将模型权重封装为资产，只有特定私钥持有者（家属）可唤醒 AI。
-- **智能合约触发**：实现“数字遗嘱”，在特定时刻或通过情感验证后释放遗产或信息。
+### 2. 区块链存证 (MemoryLock)
+利用区块链解决“情感资产确权”问题。将素材哈希与模型权重锚定在 **Sepolia** 测试网上，实现：
+- **数字所有权**：只有持有特定私钥的家属才能“唤醒”特定的 AI 形象。
+- **永续存储**：去中心化存证，记忆不再依赖单一服务商。
+
+### 3. 伦理与安全 (Ethics & Safety) 🛡️
+- **身份验证**：系统集成亲属关系声明环节，防止音色克隆技术滥用。
+- **数据隐私**：所有敏感音频仅用于模型训练，确保用户隐私。
+- **心理导向**：AI 在对话中提供适时的心理慰藉与温馨提示。
+
+---
+
+## 🌈 未来愿景 (Vision)
+- **多模态记忆**：从语音交互扩展到数字人 (Digital Human) 与 VR 沉浸式场景。
+- **数字遗产 DAO**：建立去中心化自治组织，共同维护家族的数字资产与记忆资产。
+- **跨时空对话**：让智慧与爱跨越时空，成为家族传承的一部分。
 
 ---
 
 ## 🚀 快速开始
 
-### 环境准备
-```bash
-# Python 3.10+
-python --version
-
-# 推荐使用 uv 包管理器
-pip install uv
-```
-
-### 安装与配置
-1. **克隆项目并安装依赖**
-```bash
-git clone https://github.com/your-repo/BeWithMe.git
-cd BeWithMe
-uv venv
-source .venv/bin/activate
-uv pip install -r requirements.txt
-```
-
-2. **配置环境变量**
-复制 `.env.example` 为 `.env` 并填写您的 API 密钥：
-```env
-MISTRAL_API_KEY=your_key
-ELEVENLABS_API_KEY=your_key
-WANDB_API_KEY=your_key
-```
-
 ### 启动应用
-**推荐方式：一键启动**
 ```bash
 chmod +x scripts/run_all.sh
 ./scripts/run_all.sh
@@ -77,55 +120,6 @@ chmod +x scripts/run_all.sh
 启动后访问：
 - 🎨 **前端 UI**: `http://localhost:8501`
 - 🔧 **API 文档**: `http://localhost:8000/docs`
-
----
-
-## 🎯 W&B 微调工作流
-
-我们提供了一套完整的微调 pipeline，帮助您训练出更具“灵魂”的模型。
-
-```bash
-# 1. 准备训练数据
-python -m src.training.data_preparation
-
-# 2. 启动 Mistral 微调 (W&B 实时监控)
-python -m src.training.mistral_finetuner
-
-# 3. 运行评估并查看 Weave 追踪
-./scripts/evaluate_model.sh
-```
-
-**为什么选择微调？**
-通过微调，模型能够从底层学习到特定人物的语序、语气与情感反馈逻辑，相比单纯的 System Prompt，响应更真实、更具代入感。
-
----
-
-## 🏗️ 项目架构
-
-```
-BeWithMe/
-├── src/
-│   ├── core/           # 核心逻辑 (ASR, Voice Cloning, Conversation)
-│   ├── api/            # FastAPI 后端路由与模型
-│   ├── frontend/       # Streamlit 前端应用
-│   └── training/       # W&B 微调与数据处理脚本
-├── blockchain/         # 智能合约与部署脚本 (Solidity)
-├── scripts/            # 自动化运行脚本
-├── docs/               # 详细文档与静态资源
-└── tests/              # 自动化测试用例
-```
-
----
-
-## 📜 许可说明
-本项目基于 MIT 协议开源。请遵循相关伦理规范，在合法合规的前提下使用声音克隆技术。
-
----
-
-## 🙏 致谢
-- **Mistral AI** 提供强大的 LLM 支持
-- **Weights & Biases** 提供卓越的实验追踪与评估工具
-- **NVIDIA** 组织本次全球黑客松
 
 ---
 🏆 **Hackathon Judges**: 详细评审路径请参考 [DEMO_GUIDE.md](docs/DEMO_GUIDE.md)

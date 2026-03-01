@@ -142,15 +142,25 @@ export const useAppStore = defineStore('app', () => {
     isAdmin.value = status;
   }
 
+  function logout() {
+    isLoggedIn.value = false;
+    walletAddress.value = null;
+    isAdmin.value = false;
+    currentUserId.value = 1;
+    reset();
+  }
+
   function reset() {
+    systemStatus.value = null;
     voiceCloned.value = false;
     voiceId.value = null;
     voiceName.value = null;
     agentCreated.value = false;
     agentName.value = null;
     chatHistory.value = [];
+    relationships.value = [];
     currentStep.value = 0;
-    isAdmin.value = false;
+    error.value = null;
   }
 
   return {
@@ -189,6 +199,7 @@ export const useAppStore = defineStore('app', () => {
     setCurrentUserId,
     setLoggedIn,
     setAdmin,
+    logout,
     reset
   };
 });

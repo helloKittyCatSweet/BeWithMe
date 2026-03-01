@@ -290,6 +290,7 @@ const form = reactive({
   guardian_name: '',
   relative_name: '',
   relationship_type: '',
+  purpose: 'voice_cloning',
 });
 
 const rules = {
@@ -344,7 +345,11 @@ async function submitRelationship() {
     
   } catch (error: any) {
     console.error(error);
-    ElMessage.error(error.response?.data?.detail || 'Submission failed');
+    const detail = error.response?.data?.detail;
+    const errorMessage = Array.isArray(detail)
+      ? detail.map((item: any) => item?.msg || 'Validation error').join('; ')
+      : detail || 'Submission failed';
+    ElMessage.error(errorMessage);
   } finally {
     loading.value = false;
   }

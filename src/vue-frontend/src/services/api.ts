@@ -269,11 +269,26 @@ export const quickTTS = async (
   formData.append('text', text);
   formData.append('voice_id', voiceId);
 
-  const { data } = await apiClient.post('/voice/quick-tts', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-    responseType: 'blob'
-  });
-  return data;
+  try {
+    const { data } = await apiClient.post('/voice/quick-tts', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      responseType: 'blob'
+    });
+    return data;
+  } catch (error: any) {
+    const blobData = error?.response?.data;
+    if (blobData instanceof Blob) {
+      try {
+        const text = await blobData.text();
+        const parsed = JSON.parse(text);
+        const detail = parsed?.detail || parsed?.error || parsed?.message;
+        throw new Error(detail || 'TTS request failed');
+      } catch {
+        throw new Error('TTS request failed');
+      }
+    }
+    throw error;
+  }
 };
 
 // ============ Agent APIs ============
@@ -294,7 +309,16 @@ export const resetAgent = async (): Promise<{ success: boolean; message: string 
   return data;
 };
 
-// ============ Chat APIs ============
+export const listVoiceProfiles = async (
+  userId: number
+): Promise<any[]> => {
+  const { data } = await apiClient.get('/voice/list', {
+    params: { user_id: userId }
+  });
+  return data;
+};
+
+// ============ Agent APIs ============
 
 export const sendTextMessage = async (
   message: string,
@@ -308,16 +332,58 @@ export const sendTextMessage = async (
 };
 
 export const sendVoiceMessage = async (
-  audioFile: File
-): Promise<Blob> => {
+  audioFile: Blob
+): Promise<{ 
+  agent_response: string
+  audio_url: string | null
+  user_message: string
+  ipfs_hash?: string
+  blockchain_tx_hash?: string
+}> => {
   const formData = new FormData();
-  formData.append('audio_file', audioFile);
+  // Convert blob to file if needed
+  const file = audioFile instanceof File ? audioFile : new File([audioFile], 'audio.wav', { type: 'audio/wav' });
+  formData.append('audio_file', file);
 
-  const { data } = await apiClient.post('/chat/voice', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-    responseType: 'blob'
+  const response = await apiClient.post<{
+    user_message: string;
+    agent_response: string;
+    has_audio: boolean;
+    audio_data?: string;
+    audio_format?: string;
+    ipfs_hash?: string;
+    blockchain_tx_hash?: string;
+  }>('/chat/voice', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
   });
-  return data;
+  
+  let audioUrl: string | null = null;
+  
+  // Handle audio data if present
+  if (response.data.has_audio && response.data.audio_data) {
+    try {
+      // Decode base64 audio data
+      const binaryString = atob(response.data.audio_data);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      
+      // Create blob and object URL
+      const audioBlob = new Blob([bytes], { type: 'audio/mp3' });
+      audioUrl = URL.createObjectURL(audioBlob);
+    } catch (e) {
+      console.error('Failed to decode audio data:', e);
+    }
+  }
+  
+  return {
+    user_message: response.data.user_message,
+    agent_response: response.data.agent_response,
+    audio_url: audioUrl,
+    ipfs_hash: response.data.ipfs_hash,
+    blockchain_tx_hash: response.data.blockchain_tx_hash
+  };
 };
 
 export const simulateCall = async (

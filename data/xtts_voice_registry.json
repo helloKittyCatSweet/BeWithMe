@@ -1,0 +1,9 @@
+{
+  "xtts_271f2021d5d9": {
+    "voice_id": "xtts_271f2021d5d9",
+    "name": "Wang Xiaoqiang's Voice",
+    "description": "克隆的亲人声音",
+    "language": "zh-cn",
+    "ref_audio_path": "data/xtts_reference_audio/xtts_271f2021d5d9.mp3"
+  }
+}

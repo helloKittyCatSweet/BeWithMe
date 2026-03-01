@@ -12,6 +12,11 @@ MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY", "")
 ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "")
 WANDB_API_KEY = os.getenv("WANDB_API_KEY", "")
 
+# Voice Cloning Provider
+VOICE_PROVIDER = os.getenv("VOICE_PROVIDER", "auto")  # auto | elevenlabs | xtts-space
+XTTS_SPACE_ID = os.getenv("XTTS_SPACE_ID", "applore/xtts-voice-cloning-demo")
+XTTS_LANGUAGE = os.getenv("XTTS_LANGUAGE", "zh-cn")
+
 # Pinata IPFS Configuration
 PINATA_API_KEY = os.getenv("PINATA_API_KEY", "f287105113f97222914c")
 PINATA_SECRET_KEY = os.getenv("PINATA_SECRET_KEY", "b9c8d88f86539e515a4b87fc426b321adc81496294ec73d74bc6fe3d31e8b78d")
@@ -24,6 +29,7 @@ WANDB_ENTITY = os.getenv("WANDB_ENTITY", "")
 # Model Settings
 MISTRAL_MODEL = os.getenv("MISTRAL_MODEL", "open-mistral-7b")
 WHISPER_MODEL = os.getenv("WHISPER_MODEL", "base")
+ASR_ENGINE = os.getenv("ASR_ENGINE", "gradio")  # 'local' or 'gradio'
 
 # Audio Settings
 SAMPLE_RATE = 16000

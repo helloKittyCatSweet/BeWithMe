@@ -10,6 +10,8 @@ from pydantic import BaseModel
 import tempfile
 import os
 import logging
+import shutil
+import subprocess
 from datetime import datetime
 
 from ...core.voice_cloning import VoiceCloner
@@ -34,6 +36,67 @@ router = APIRouter(prefix="/voice", tags=["voice"])
 voice_cloner = VoiceCloner()
 
 
+def _audio_response_meta(audio_path: str, default_name: str):
+    ext = os.path.splitext(audio_path)[1].lower()
+    if ext == ".wav":
+        return "audio/wav", f"{default_name}.wav"
+    if ext == ".ogg":
+        return "audio/ogg", f"{default_name}.ogg"
+    return "audio/mpeg", f"{default_name}.mp3"
+
+
+def _extract_audio_from_mp4(input_path: str) -> str:
+    """从 MP4 文件提取音轨为 MP3 文件，返回 MP3 路径。"""
+    if not shutil.which("ffmpeg"):
+        raise HTTPException(
+            status_code=500,
+            detail="服务器未安装 ffmpeg，无法处理 MP4。请安装 ffmpeg 后重试。"
+        )
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as output_file:
+        output_path = output_file.name
+
+    try:
+        subprocess.run(
+            [
+                "ffmpeg",
+                "-y",
+                "-i",
+                input_path,
+                "-vn",
+                "-acodec",
+                "libmp3lame",
+                "-ar",
+                "44100",
+                "-ac",
+                "1",
+                output_path,
+            ],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        return output_path
+    except subprocess.CalledProcessError as exc:
+        logger.error(f"从 MP4 提取音频失败: {exc.stderr}")
+        if os.path.exists(output_path):
+            os.unlink(output_path)
+        raise HTTPException(status_code=400, detail="MP4 文件音轨提取失败，请确认文件包含可用音频")
+
+
+@router.get("/list", response_model=List[VoiceInfo])
+async def list_voice_profiles(
+    user_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    获取用户的所有音色档案
+    """
+    profiles = get_user_voice_profiles(db, user_id)
+    return profiles
+
+
 @router.post("/clone")
 async def clone_voice(
     audio_file: UploadFile = File(...),
@@ -46,7 +109,7 @@ async def clone_voice(
     """
     上传音频克隆音色
     
-    - **audio_file**: 30秒音频文件 (.mp3 或 .wav)
+    - **audio_file**: 音频样本文件（支持 .mp3/.wav/.m4a/.flac/.mp4，MP4 将自动提取音轨）
     - **voice_name**: 音色名称
     - **description**: 音色描述
     - **user_id**: 用户 ID
@@ -67,16 +130,27 @@ async def clone_voice(
         log_action(db, user_id, "voice_clone_no_verification", "VoiceProfile", None,
                   details="Voice cloning without relationship verification")
     
+    temp_files_to_cleanup = []
+
     try:
-        # 保存上传的文件
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_file:
+        # 保存上传文件，并在 MP4 情况下提取音轨
+        original_suffix = os.path.splitext(audio_file.filename or "")[1].lower()
+        upload_suffix = original_suffix if original_suffix else ".mp3"
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=upload_suffix) as tmp_file:
             content = await audio_file.read()
             tmp_file.write(content)
-            tmp_path = tmp_file.name
+            uploaded_path = tmp_file.name
+            temp_files_to_cleanup.append(uploaded_path)
+
+        processing_path = uploaded_path
+        if upload_suffix == ".mp4":
+            processing_path = _extract_audio_from_mp4(uploaded_path)
+            temp_files_to_cleanup.append(processing_path)
         
         # 克隆音色
         voice_id = voice_cloner.create_voice_from_file(
-            tmp_path, 
+            processing_path,
             voice_name, 
             description
         )
@@ -84,19 +158,19 @@ async def clone_voice(
         # 分析音频特征
         analysis = None
         try:
-            analysis = analyze_voice_sample(tmp_path)
+            analysis = analyze_voice_sample(processing_path)
         except:
             pass
         
         # 保存音频文件到永久位置
         audio_dir = "data/voice_samples"
         os.makedirs(audio_dir, exist_ok=True)
-        audio_filename = f"voice_{user_id}_{voice_id}.mp3"
+        processed_ext = os.path.splitext(processing_path)[1].lower() or ".mp3"
+        audio_filename = f"voice_{user_id}_{voice_id}{processed_ext}"
         audio_path = os.path.join(audio_dir, audio_filename)
         
         # 复制到永久位置
-        import shutil
-        shutil.copy(tmp_path, audio_path)
+        shutil.copy(processing_path, audio_path)
         
         # 上传到 IPFS (如果启用)
         ipfs_hash = None
@@ -132,10 +206,6 @@ async def clone_voice(
             except Exception as e:
                 logger.error(f"IPFS upload error: {e}")
                 # 不抛出异常，允许继续执行（IPFS 上传是可选的）
-        
-        # 清理临时文件
-        if os.path.exists(tmp_path):
-            os.unlink(tmp_path)
         
         if voice_id:
             # 创建音色档案记录（如果提供了关系 ID）
@@ -188,6 +258,13 @@ async def clone_voice(
         log_action(db, user_id, "voice_clone_error", "VoiceProfile", None,
                   success=False, error_message=str(e))
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        for temp_file in temp_files_to_cleanup:
+            try:
+                if temp_file and os.path.exists(temp_file):
+                    os.unlink(temp_file)
+            except Exception:
+                pass
 
 
 @router.get("/list", response_model=dict)
@@ -301,8 +378,8 @@ async def simulate_call(
         
         return FileResponse(
             path=audio_path,
-            media_type="audio/mpeg",
-            filename="response.mp3",
+            media_type=_audio_response_meta(audio_path, "response")[0],
+            filename=_audio_response_meta(audio_path, "response")[1],
             headers={
                 "X-User-Message": user_text,
                 "X-AI-Response": ai_response
@@ -357,8 +434,8 @@ async def quick_tts(
         
         return FileResponse(
             path=audio_path,
-            media_type="audio/mpeg",
-            filename="tts_output.mp3"
+            media_type=_audio_response_meta(audio_path, "tts_output")[0],
+            filename=_audio_response_meta(audio_path, "tts_output")[1]
         )
         
     except HTTPException:

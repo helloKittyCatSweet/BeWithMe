@@ -1,14 +1,14 @@
 <template>
   <div class="voice-clone">
     <div class="header">
-      <h2>🎙️ Step 1: Voice Cloning</h2>
+      <h2>Voice Cloning</h2>
       <p class="subtitle">Upload audio samples to clone your loved one's voice.</p>
     </div>
 
     <el-alert
       v-if="!appStore.hasApprovedRelationship"
       type="warning"
-      title="⚠️ Family Verification Required"
+      title="Family Verification Required"
       description="Please complete and get approval for the Family Verification step first, then refresh the page."
       :closable="false"
       show-icon
@@ -21,7 +21,7 @@
         <el-card shadow="hover">
           <template #header>
             <div class="card-header">
-              <span>🎤 Clone New Voice</span>
+              <span>Clone New Voice</span>
             </div>
           </template>
 
@@ -79,7 +79,7 @@
                 :limit="1"
                 :on-change="handleAudioChange"
                 :on-remove="handleAudioRemove"
-                accept="audio/wav,audio/mpeg,audio/mp4,audio/flac"
+                accept="audio/wav,audio/mpeg,audio/mp4,audio/flac,video/mp4,.mp4"
               >
                 <el-icon class="el-icon--upload"><upload-filled /></el-icon>
                 <div class="el-upload__text">
@@ -87,10 +87,10 @@
                 </div>
                 <template #tip>
                   <div class="el-upload__tip">
-                    <p>📋 <strong>Audio Requirements:</strong></p>
+                    <p><strong>Audio Requirements:</strong></p>
                     <ul>
-                      <li>Format: WAV, MP3, M4A, FLAC</li>
-                      <li>Duration: 10s - 5 min</li>
+                      <li>Format: WAV, MP3, M4A, FLAC, MP4 (MP4 will use audio track only)</li>
+                      <li>Duration: 10s - 30s</li>
                       <li>Quality: Clear, no noise, single speaker</li>
                     </ul>
                   </div>
@@ -126,7 +126,7 @@
             <!-- Progress -->
             <el-collapse-transition>
               <div v-if="cloning" style="margin-top: 20px;">
-                <el-divider>🔄 Cloning Progress</el-divider>
+                <el-divider>Cloning Progress</el-divider>
                 <el-steps :active="cloneStep" finish-status="success" align-center>
                   <el-step title="Uploading" />
                   <el-step title="Analyzing" />
@@ -143,7 +143,7 @@
             <el-alert
               v-if="cloneResult"
               :type="cloneResult.success ? 'success' : 'error'"
-              :title="cloneResult.success ? '✅ Voice Cloned Successfully!' : '❌ Cloning Failed'"
+              :title="cloneResult.success ? 'Voice Cloned Successfully!' : '❌ Cloning Failed'"
               :closable="false"
               show-icon
               style="margin-top: 20px;"
@@ -186,7 +186,7 @@
                     </el-button>
                   </p>
                   <el-text size="small" type="info" style="margin-top: 5px; display: block;">
-                    ✅ Your audio is permanently stored on IPFS (Decentralized Storage)
+                    Your audio is permanently stored on IPFS (Decentralized Storage)
                   </el-text>
                 </div>
                 
@@ -216,7 +216,7 @@
                   :disabled="!cloneResult.voice_id"
                   icon="DataAnalysis"
                 >
-                  🔗 Save to Blockchain
+                  Save to Blockchain
                 </el-button>
               </div>
               <p v-else>{{ cloneResult.message }}</p>
@@ -231,7 +231,7 @@
         <el-card shadow="hover">
           <template #header>
             <div class="card-header">
-              <span>🎵 Cloned Voices</span>
+              <span>Cloned Voices</span>
               <el-button 
                 size="small" 
                 text
@@ -244,9 +244,14 @@
             </div>
           </template>
 
-          <div v-if="voices.length > 0" class="voice-list">
+          <el-tabs v-model="voiceListTab" style="margin-bottom: 10px;">
+            <el-tab-pane :label="`Your Voices (${customVoices.length})`" name="custom" />
+            <el-tab-pane :label="`System Voices (${systemVoices.length})`" name="system" />
+          </el-tabs>
+
+          <div v-if="displayedVoices.length > 0" class="voice-list">
             <div 
-              v-for="voice in voices" 
+              v-for="voice in displayedVoices"
               :key="voice.voice_id"
               class="voice-item"
               :class="{ active: voice.voice_id === appStore.voiceId }"
@@ -254,6 +259,12 @@
               <div class="voice-header">
                 <el-icon><Avatar /></el-icon>
                 <span class="voice-name">{{ voice.name }}</span>
+                <el-tag
+                  size="small"
+                  :type="isUserDefinedVoice(voice) ? 'success' : 'info'"
+                >
+                  {{ isUserDefinedVoice(voice) ? 'Custom' : 'System' }}
+                </el-tag>
               </div>
               <div class="voice-info">
                 <el-tag size="small" type="info">ID: {{ voice.voice_id.slice(0, 8) }}...</el-tag>
@@ -286,13 +297,13 @@
             </div>
           </div>
 
-          <el-empty v-else description="No voices cloned yet" />
+          <el-empty v-else :description="voiceListTab === 'custom' ? 'No custom voices yet' : 'No system voices available'" />
         </el-card>
 
         <!-- Test Output -->
         <el-card v-if="testAudioUrl" style="margin-top: 20px;" shadow="hover">
           <template #header>
-            <span>🔊 Test Output</span>
+            <span>Test Output</span>
           </template>
           <audio :src="testAudioUrl" controls style="width: 100%;"></audio>
         </el-card>
@@ -352,11 +363,16 @@ const cloneResult = ref<VoiceCloneResponse | null>(null);
 const audioPreviewUrl = ref<string | null>(null);
 
 const voices = ref<Voice[]>([]);
+const voiceListTab = ref<'custom' | 'system'>('custom');
 const loadingVoices = ref(false);
 const deletingVoice = ref<string | null>(null);
 const testingVoice = ref<string | null>(null);
 const testAudioUrl = ref<string | null>(null);
 const savingToBlockchain = ref(false);
+
+const customVoices = computed(() => voices.value.filter(v => isUserDefinedVoice(v)));
+const systemVoices = computed(() => voices.value.filter(v => !isUserDefinedVoice(v)));
+const displayedVoices = computed(() => voiceListTab.value === 'custom' ? customVoices.value : systemVoices.value);
 
 onMounted(async () => {
   await loadVoices();
@@ -450,12 +466,29 @@ async function loadVoices() {
     const data = await listVoices();
     if (data.success) {
       voices.value = data.voices;
+      if (voiceListTab.value === 'custom' && customVoices.value.length === 0 && systemVoices.value.length > 0) {
+        voiceListTab.value = 'system';
+      }
     }
   } catch (error: any) {
     ElMessage.error(`Failed to load voices: ${error.message}`);
   } finally {
     loadingVoices.value = false;
   }
+}
+
+function isUserDefinedVoice(voice: Voice) {
+  const voiceData = voice as Voice & {
+    category?: string;
+    labels?: {
+      description?: string;
+      source?: string;
+    };
+  };
+  const category = (voiceData.category || '').toLowerCase();
+  const source = (voiceData.labels?.source || '').toLowerCase();
+
+  return voice.voice_id.startsWith('xtts_') || category === 'cloned' || category === 'generated' || source === 'user';
 }
 
 async function handleDeleteVoice(voiceId: string) {
@@ -508,9 +541,9 @@ async function saveToBlockchain() {
     
     if (result.success) {
       cloneResult.value.blockchain_saved = true;
-      ElMessage.success(`✅ Voice saved to blockchain! Tx: ${result.tx_hash?.slice(0, 10)}...`);
+      ElMessage.success(`Voice saved to blockchain! Tx: ${result.tx_hash?.slice(0, 10)}...`);
     } else {
-      ElMessage.error(`❌ Failed to save: ${result.error}`);
+      ElMessage.error(`Failed to save: ${result.error}`);
     }
   } catch (error: any) {
     ElMessage.error(`Blockchain save failed: ${error.message}`);

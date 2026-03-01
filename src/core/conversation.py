@@ -3,15 +3,20 @@
 Module B: Conversation Generation with Personality Injection (Mistral)
 """
 try:
-    from mistralai.client import MistralClient
-    from mistralai.models.chat_completion import ChatMessage
-except ImportError:
-    # Fallback for different mistralai versions
+    # Try mistralai >= 1.0
+    from mistralai import Mistral
+    # For newer versions, also try to get ChatMessage
     try:
-        from mistralai import MistralClient
-        ChatMessage = None  # Will use dict format
-    except ImportError:
-        MistralClient = None
+        from mistralai.models.chat_completion import ChatMessage
+    except (ImportError, ModuleNotFoundError):
+        ChatMessage = None
+except (ImportError, ModuleNotFoundError):
+    try:
+        # Fallback for 0.1.x versions
+        from mistralai import MistralClient as Mistral
+        ChatMessage = None
+    except (ImportError, ModuleNotFoundError):
+        Mistral = None
         ChatMessage = None
 
 from ..config import MISTRAL_API_KEY, MISTRAL_MODEL, TEMPERATURE, MAX_TOKENS, WANDB_PROJECT
@@ -79,8 +84,24 @@ class ConversationAgent:
     ):
         self.profile = profile
         self.api_key = api_key or MISTRAL_API_KEY
-        self.client = MistralClient(api_key=self.api_key)
+        
+        # Verify Mistral import
+        if Mistral is None:
+            raise ImportError(
+                "mistralai library is not installed. "
+                "Please install it with: uv pip install mistralai"
+            )
+        
+        # Verify API key is available
+        if not self.api_key:
+            raise ValueError(
+                "MISTRAL_API_KEY not configured. Please check your .env file "
+                "or pass api_key parameter explicitly."
+            )
+        
+        self.client = Mistral(api_key=self.api_key)
         self.conversation_history: List[Dict] = []
+        self.voice_id: Optional[str] = None  # Optional voice ID for TTS
         
         # 初始化 W&B Weave（可选）
         if enable_weave and WEAVE_AVAILABLE:
@@ -106,31 +127,22 @@ class ConversationAgent:
             回复文本
         """
         try:
-            # 构建消息历史
+            # 构建消息历史 - 总是使用字典格式以保证兼容性
             system_msg = self.profile.generate_system_prompt()
             
-            if ChatMessage:
-                messages = [ChatMessage(role="system", content=system_msg)]
-            else:
-                messages = [{"role": "system", "content": system_msg}]
+            messages = [{"role": "system", "content": system_msg}]
             
             # 添加历史对话（保留最近5轮）
             for msg in self.conversation_history[-10:]:
-                if ChatMessage:
-                    messages.append(ChatMessage(
-                        role=msg["role"], 
-                        content=msg["content"]
-                    ))
-                else:
-                    messages.append(msg)
+                messages.append({
+                    "role": msg["role"], 
+                    "content": msg["content"]
+                })
             
             # 添加当前用户输入
-            if ChatMessage:
-                messages.append(ChatMessage(role="user", content=user_input))
-            else:
-                messages.append({"role": "user", "content": user_input})
+            messages.append({"role": "user", "content": user_input})
             
-            # 调用 Mistral API（优先使用 open-* 模型）
+            # 调用 Mistral API
             if stream:
                 response_text = ""
                 for chunk in self.client.chat_stream(
@@ -139,10 +151,12 @@ class ConversationAgent:
                     temperature=TEMPERATURE,
                     max_tokens=MAX_TOKENS
                 ):
-                    if chunk.choices[0].delta.content:
-                        content = chunk.choices[0].delta.content
-                        response_text += content
-                        yield content
+                    if hasattr(chunk, 'choices') and chunk.choices and len(chunk.choices) > 0:
+                        if hasattr(chunk.choices[0], 'delta') and chunk.choices[0].delta:
+                            if hasattr(chunk.choices[0].delta, 'content') and chunk.choices[0].delta.content:
+                                content = chunk.choices[0].delta.content
+                                response_text += content
+                                yield content
                 
                 # 保存对话历史
                 self.conversation_history.append({"role": "user", "content": user_input})
@@ -157,6 +171,12 @@ class ConversationAgent:
                 )
                 
                 response_text = response.choices[0].message.content
+                
+                # 保存对话历史
+                self.conversation_history.append({"role": "user", "content": user_input})
+                self.conversation_history.append({"role": "assistant", "content": response_text})
+                
+                return response_text
                 
                 # 保存对话历史
                 self.conversation_history.append({"role": "user", "content": user_input})

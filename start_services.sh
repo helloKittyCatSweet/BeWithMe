@@ -9,6 +9,10 @@ set -e
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$PROJECT_DIR"
 
+FRONTEND_DIR="src/vue-frontend"
+BACKEND_PORT=8000
+FRONTEND_PORT=5173
+
 # 颜色输出
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
@@ -40,14 +44,36 @@ fi
 
 echo -e "${GREEN}✅ 环境变量已加载${NC}"
 
+# 检查前端目录
+if [ ! -d "$FRONTEND_DIR" ]; then
+    echo -e "${RED}❌ 前端目录不存在: $FRONTEND_DIR${NC}"
+    exit 1
+fi
+
+# 检查 npm
+if ! command -v npm >/dev/null 2>&1; then
+    echo -e "${RED}❌ 未检测到 npm，请先安装 Node.js (含 npm)${NC}"
+    exit 1
+fi
+
 # 创建日志目录
 mkdir -p logs
+
+# 安装前端依赖（如缺失）
+if [ ! -d "$FRONTEND_DIR/node_modules" ]; then
+    echo -e "\n${BLUE}📦 安装前端依赖 (npm install)...${NC}"
+    (
+        cd "$FRONTEND_DIR"
+        npm install > "$PROJECT_DIR/logs/frontend-install.log" 2>&1
+    )
+    echo -e "${GREEN}✅ 前端依赖安装完成${NC}"
+fi
 
 # 启动后端
 echo -e "\n${BLUE}📡 启动后端 (FastAPI)...${NC}"
 uvicorn src.api.main:app \
     --host 0.0.0.0 \
-    --port 8000 \
+    --port $BACKEND_PORT \
     --log-level info \
     > logs/backend.log 2>&1 &
 
@@ -57,7 +83,7 @@ echo -e "${GREEN}✅ 后端启动中 (PID: $BACKEND_PID)${NC}"
 # 等待后端启动
 echo -e "${YELLOW}⏳ 等待后端就绪...${NC}"
 for i in {1..30}; do
-    if curl -s http://localhost:8000/ > /dev/null 2>&1; then
+    if curl -s http://localhost:$BACKEND_PORT/ > /dev/null 2>&1; then
         echo -e "${GREEN}✅ 后端已就绪！${NC}"
         break
     fi
@@ -70,21 +96,19 @@ for i in {1..30}; do
 done
 
 # 启动前端
-echo -e "\n${BLUE}🎨 启动前端 (Streamlit)...${NC}"
-streamlit run src/frontend/app.py \
-    --server.port 8501 \
-    --server.address 0.0.0.0 \
-    --server.headless true \
-    --browser.gatherUsageStats false \
-    > logs/frontend.log 2>&1 &
+echo -e "\n${BLUE}🎨 启动前端 (Vue + Vite)...${NC}"
+(
+    cd "$FRONTEND_DIR"
+    npm run dev -- --host 0.0.0.0 --port $FRONTEND_PORT > "$PROJECT_DIR/logs/frontend.log" 2>&1
+) &
 
 FRONTEND_PID=$!
 echo -e "${GREEN}✅ 前端启动中 (PID: $FRONTEND_PID)${NC}"
 
 # 等待前端启动
 echo -e "${YELLOW}⏳ 等待前端就绪...${NC}"
-for i in {1..30}; do
-    if curl -s http://localhost:8501/ > /dev/null 2>&1; then
+for i in {1..60}; do
+    if curl -s http://localhost:$FRONTEND_PORT/ > /dev/null 2>&1; then
         echo -e "${GREEN}✅ 前端已就绪！${NC}"
         break
     fi
@@ -106,9 +130,9 @@ echo -e "${GREEN}  ✅ 所有服务已启动！${NC}"
 echo -e "${GREEN}============================================${NC}"
 echo -e ""
 echo -e "${BLUE}🔗 访问地址:${NC}"
-echo -e "   前端 (Streamlit): ${YELLOW}http://localhost:8501${NC}"
-echo -e "   后端 (FastAPI):   ${YELLOW}http://localhost:8000${NC}"
-echo -e "   API 文档:         ${YELLOW}http://localhost:8000/docs${NC}"
+echo -e "   前端 (Vue):       ${YELLOW}http://localhost:$FRONTEND_PORT${NC}"
+echo -e "   后端 (FastAPI):   ${YELLOW}http://localhost:$BACKEND_PORT${NC}"
+echo -e "   API 文档:         ${YELLOW}http://localhost:$BACKEND_PORT/docs${NC}"
 echo -e ""
 echo -e "${BLUE}📊 日志文件:${NC}"
 echo -e "   后端: logs/backend.log"

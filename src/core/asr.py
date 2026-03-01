@@ -190,3 +190,77 @@ def analyze_voice_sample(audio_path: str) -> Dict:
             "speech_patterns": [],
             "duration": 0
         }
+
+class GradioWhisperASR:
+    """
+    使用 Hugging Face Gradio API 的 Whisper 语音识别引擎
+    
+    优点：
+    - 无需本地 GPU/CPU
+    - 完全免费，由 HuggingFace 托管
+    - 无需下载大的模型文件
+    
+    缺点：
+    - 需要互联网连接
+    - 速度取决于 HF 服务器
+    - 如果 HF 服务挂了无法使用
+    """
+    
+    def __init__(self):
+        """初始化 Gradio 客户端"""
+        try:
+            from gradio_client import Client
+            self.client = Client("openai/whisper")
+            logger.info("✅ Gradio Whisper API 客户端初始化成功")
+        except ImportError:
+            logger.error("❌ gradio_client 未安装，请运行: pip install gradio_client")
+            raise ImportError("需要安装 gradio_client: pip install gradio_client")
+        except Exception as e:
+            logger.error(f"❌ Gradio 客户端连接失败: {str(e)}")
+            raise
+    
+    def transcribe_audio(
+        self, 
+        audio_path: str,
+        language: str = "zh",
+        return_timestamps: bool = False
+    ) -> Optional[Dict]:
+        """
+        使用 Gradio API 转录音频文件
+        
+        Args:
+            audio_path: 音频文件路径
+            language: 语言代码 (仅用于日志，Whisper会自动检测)
+            return_timestamps: 是否返回时间戳 (Gradio API 不支持)
+            
+        Returns:
+            包含转录文本的字典，格式与 WhisperASR 兼容
+        """
+        try:
+            logger.info(f"🌐 调用 Gradio Whisper API...")
+            logger.info(f"📁 音频文件: {audio_path}")
+            
+            # 调用 Gradio API，task="transcribe" 为转录模式
+            result = self.client.predict(
+                inputs=audio_path,
+                task="transcribe",
+                api_name="/predict"
+            )
+            
+            logger.info(f"✅ API 调用成功，识别结果: {result}")
+            
+            # 返回与 WhisperASR 兼容的格式
+            return {
+                "text": result,
+                "language": language,
+                "segments": [{"text": result}]  # 简化格式，不包含时间戳
+            }
+            
+        except Exception as e:
+            logger.error(f"❌ Gradio API 调用失败: {str(e)}")
+            return None
+    
+    def extract_speech_patterns(self, audio_path: str) -> list:
+        """提取语音模式（不支持）"""
+        logger.warning("⚠️ Gradio Whisper API 不支持语音模式提取")
+        return []

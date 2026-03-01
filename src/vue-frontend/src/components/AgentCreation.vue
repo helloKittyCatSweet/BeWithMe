@@ -1,19 +1,11 @@
 <template>
   <div class="agent-creation">
     <div class="header">
-      <h2>🧠 Step 2: Create Digital Agent</h2>
+      <h2>Create Digital Agent</h2>
       <p class="subtitle">Create a digital agent based on your loved one's information.</p>
     </div>
 
-    <el-alert
-      v-if="!appStore.voiceCloned"
-      type="warning"
-      title="⚠️ Voice Cloning Required"
-      description="Please complete Voice Cloning in Step 1 first."
-      :closable="false"
-      show-icon
-      style="margin-bottom: 20px;"
-    />
+
 
     <el-row :gutter="20">
       <!-- Agent Form -->
@@ -21,7 +13,7 @@
         <el-card shadow="hover">
           <template #header>
             <div class="card-header">
-              <span>🤖 Create New Agent</span>
+              <span>Create New Agent</span>
             </div>
           </template>
 
@@ -30,7 +22,6 @@
             :model="agentForm"
             :rules="agentRules"
             label-position="top"
-            :disabled="!appStore.voiceCloned"
             @submit.prevent="submitAgent"
           >
             <el-form-item label="Agent Name" prop="name">
@@ -81,6 +72,30 @@
               />
             </el-form-item>
             
+            <el-form-item label="Voice Selection" prop="voice_id">
+              <el-select 
+                v-model="agentForm.voice_id" 
+                placeholder="Select a cloned voice for this agent"
+                style="width: 100%;"
+                :loading="loadingVoices"
+              >
+                <el-option 
+                  v-if="appStore.voiceId && !voices.some(v => v.voice_id === appStore.voiceId)"
+                  :label="`Current Voice (${appStore.voiceName || appStore.voiceId.slice(0, 8)}...)`"
+                  :value="appStore.voiceId"
+                />
+                <el-option
+                  v-for="voice in voices"
+                  :key="voice.voice_id"
+                  :label="`${voice.name} ${voice.voice_id.startsWith('xtts_') ? '(Custom)' : '(System)'}`"
+                  :value="voice.voice_id"
+                />
+              </el-select>
+              <el-text size="small" type="info" style="margin-top: 5px; display: block;">
+                Choose a voice to bind with this agent for TTS responses
+              </el-text>
+            </el-form-item>
+
             <el-form-item label="Shared Memories" prop="memories">
               <el-input
                 v-model="memoriesInput"
@@ -97,7 +112,6 @@
                 size="large"
                 @click="submitAgent"
                 :loading="creating"
-                :disabled="!appStore.voiceCloned"
                 :icon="Cpu"
               >
                 Create Agent
@@ -115,7 +129,7 @@
         <el-card shadow="hover">
           <template #header>
             <div class="card-header">
-              <span>ℹ️ Agent Info</span>
+              <span>Agent Info</span>
             </div>
           </template>
           <div v-if="appStore.agentCreated">
@@ -140,10 +154,10 @@
               @click="saveAgentBlockchain"
               :loading="savingBlockchain"
             >
-              🔗 Save Hash Proof On-chain
+              Save Hash Proof On-chain
             </el-button>
             <div v-if="agentBlockchainSaved" style="margin-top: 15px; padding: 15px; background: #f0f9ff; border-radius: 4px; border-left: 4px solid #67c23a;">
-              <p style="margin: 0 0 8px 0; font-size: 14px; color: #67c23a; font-weight: 600;">✅ Saved to Blockchain</p>
+              <p style="margin: 0 0 8px 0; font-size: 14px; color: #67c23a; font-weight: 600;">Saved to Blockchain</p>
               <p style="margin: 0; font-size: 12px; color: #606266; word-break: break-all;">
                 TX: <span style="font-family: monospace;">{{ agentTxHash.substring(0, 10) }}...{{ agentTxHash.substring(agentTxHash.length - 8) }}</span>
               </p>
@@ -163,7 +177,7 @@
 
         <el-card shadow="hover" style="margin-top: 20px;">
           <template #header>
-            <span>💡 Tips</span>
+            <span>Tips</span>
           </template>
           <div class="tips-content">
             <h4>How to create a more realistic agent?</h4>
@@ -181,13 +195,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, onMounted, computed } from 'vue';
 import { ElMessage } from 'element-plus';
-import { Cpu, ChatDotRound, RefreshLeft } from '@element-plus/icons-vue';
+import { Cpu, ChatDotRound, RefreshLeft, Refresh } from '@element-plus/icons-vue';
 import type { FormInstance, FormRules } from 'element-plus';
 import { useAppStore } from '@/stores/app';
-import { createAgent, resetAgent, saveAgentToBlockchain } from '@/services/api';
-import type { AgentProfile } from '@/types/api';
+import { createAgent, resetAgent, saveAgentToBlockchain, listVoices } from '@/services/api';
+import type { AgentProfile, Voice } from '@/types/api';
 
 const emit = defineEmits<{
   'creation-success': [agentName: string],
@@ -197,16 +211,19 @@ const emit = defineEmits<{
 const appStore = useAppStore();
 const agentFormRef = ref<FormInstance>();
 
-const agentForm = reactive<AgentProfile>({
+const agentForm = reactive<AgentProfile & { voice_id?: string }>({
   name: '',
   relationship: '',
   personality_traits: '',
   speech_patterns: [],
   background_story: '',
   memories: [],
+  voice_id: undefined,
 });
 
 const memoriesInput = ref('');
+const voices = ref<Voice[]>([]);
+const loadingVoices = ref(false);
 
 const agentRules = reactive<FormRules>({
   name: [{ required: true, message: 'Please enter agent name', trigger: 'blur' }],
@@ -221,14 +238,43 @@ const agentBlockchainSaved = ref(false);
 const agentTxHash = ref('');
 const enableAgentChainProof = false;
 
-onMounted(() => {
+const voiceOptions = computed(() => 
+  voices.value.map(voice => ({
+    label: `${voice.name} ${voice.voice_id.startsWith('xtts_') ? '(Custom)' : '(System)'}`,
+    value: voice.voice_id,
+  }))
+);
+
+onMounted(async () => {
+  // Load available voices
+  await loadVoicesData();
+  
   // Pre-fill from relationship if possible
   if (appStore.approvedRelationships.length > 0) {
     const rel = appStore.approvedRelationships[0];
     agentForm.name = `Digital ${rel.relative_name}`;
     agentForm.relationship = rel.relative_name;
   }
+  
+  // Set voice_id if already available
+  if (appStore.voiceId) {
+    agentForm.voice_id = appStore.voiceId;
+  }
 });
+
+async function loadVoicesData() {
+  try {
+    loadingVoices.value = true;
+    const data = await listVoices();
+    if (data.success) {
+      voices.value = data.voices;
+    }
+  } catch (error: any) {
+    ElMessage.error(`Failed to load voices: ${error.message}`);
+  } finally {
+    loadingVoices.value = false;
+  }
+}
 
 function updateMemories() {
   agentForm.memories = memoriesInput.value.split('\n').filter(line => line.trim() !== '');

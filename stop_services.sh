@@ -79,13 +79,13 @@ if [ -n "$UVICORN_PIDS" ]; then
     STOPPED=$((STOPPED + 1))
 fi
 
-# 清理 streamlit 进程
-STREAMLIT_PIDS=$(pgrep -f "streamlit run src/frontend/app.py" || true)
-if [ -n "$STREAMLIT_PIDS" ]; then
-    echo -e "${YELLOW}⏳ 发现残留的 streamlit 进程${NC}"
-    echo "$STREAMLIT_PIDS" | xargs kill 2>/dev/null || true
+# 清理 Vite 前端进程
+VITE_PIDS=$(pgrep -f "vite.*--host 0.0.0.0.*--port 5173|npm run dev -- --host 0.0.0.0 --port 5173" || true)
+if [ -n "$VITE_PIDS" ]; then
+    echo -e "${YELLOW}⏳ 发现残留的 Vite 前端进程${NC}"
+    echo "$VITE_PIDS" | xargs kill 2>/dev/null || true
     sleep 1
-    echo -e "${GREEN}✅ 已清理 streamlit 进程${NC}"
+    echo -e "${GREEN}✅ 已清理 Vite 前端进程${NC}"
     STOPPED=$((STOPPED + 1))
 fi
 
@@ -98,10 +98,10 @@ if [ -n "$PORT_8000" ]; then
     echo -e "${YELLOW}   手动清理: kill $PORT_8000${NC}"
 fi
 
-PORT_8501=$(lsof -ti:8501 || true)
-if [ -n "$PORT_8501" ]; then
-    echo -e "${YELLOW}⚠️  端口 8501 仍被占用 (PID: $PORT_8501)${NC}"
-    echo -e "${YELLOW}   手动清理: kill $PORT_8501${NC}"
+PORT_5173=$(lsof -ti:5173 || true)
+if [ -n "$PORT_5173" ]; then
+    echo -e "${YELLOW}⚠️  端口 5173 仍被占用 (PID: $PORT_5173)${NC}"
+    echo -e "${YELLOW}   手动清理: kill $PORT_5173${NC}"
 fi
 
 # 总结
@@ -116,5 +116,5 @@ echo -e "${GREEN}============================================${NC}"
 # 提示重启
 echo -e "\n${BLUE}💡 提示:${NC}"
 echo -e "   重新启动: ${YELLOW}./start_services.sh${NC}"
-echo -e "   查看状态: ${YELLOW}ps aux | grep -E 'uvicorn|streamlit'${NC}"
+echo -e "   查看状态: ${YELLOW}ps aux | grep -E 'uvicorn|vite'${NC}"
 echo -e ""

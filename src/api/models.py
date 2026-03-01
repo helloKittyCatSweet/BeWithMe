@@ -13,6 +13,7 @@ class ProfileRequest(BaseModel):
     personality_traits: str = Field(..., description="性格特征描述")
     speech_patterns: List[str] = Field(..., description="说话习惯列表")
     custom_prompt: Optional[str] = Field("", description="自定义系统提示词")
+    voice_id: Optional[str] = Field(None, description="绑定的声音 ID")
 
 
 class ChatRequest(BaseModel):

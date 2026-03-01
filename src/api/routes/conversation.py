@@ -34,6 +34,7 @@ async def create_agent(profile: ProfileRequest):
     - **relationship**: 关系（如：奶奶、爷爷、妈妈）
     - **personality_traits**: 性格特征描述
     - **speech_patterns**: 说话习惯列表
+    - **voice_id**: 绑定的声音 ID（可选）
     """
     global current_agent
     
@@ -45,11 +46,17 @@ async def create_agent(profile: ProfileRequest):
             patterns=profile.speech_patterns
         )
         
+        # Store voice_id if provided
+        if profile.voice_id:
+            agent.voice_id = profile.voice_id
+        
         current_agent = agent
         
         # 同时设置到 chat 路由中
         from . import chat
         chat.current_agent = agent
+        if profile.voice_id:
+            chat.current_voice_id = profile.voice_id
         
         return CreateAgentResponse(
             success=True,
@@ -57,7 +64,8 @@ async def create_agent(profile: ProfileRequest):
             profile={
                 "name": profile.name,
                 "relationship": profile.relationship,
-                "personality": profile.personality_traits
+                "personality": profile.personality_traits,
+                "voice_id": profile.voice_id,
             }
         )
         

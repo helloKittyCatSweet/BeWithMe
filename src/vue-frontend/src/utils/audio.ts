@@ -80,10 +80,10 @@ export async function validateAudioFile(file: File): Promise<{
           valid: false,
           error: '音频时长必须至少 10 秒'
         });
-      } else if (audio.duration > 300) {
+      } else if (audio.duration > 30) {
         resolve({
           valid: false,
-          error: '音频时长不能超过 5 分钟'
+          error: '音频时长不能超过 30 秒'
         });
       } else {
         resolve({

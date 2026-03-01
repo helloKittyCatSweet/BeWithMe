@@ -216,13 +216,13 @@
 import { ref, onMounted, computed } from 'vue';
 import { ElMessage } from 'element-plus';
 import { Wallet, CopyDocument, TopRight, Refresh, VideoPlay, Select } from '@element-plus/icons-vue';
-import { listRelationships } from '@/services/api';
+import { listRelationships, listVoiceProfiles } from '@/services/api';
 import { useAppStore } from '@/stores/app';
 import { CONTRACT_ADDRESS, connectWallet } from '@/services/contract';
 
 const appStore = useAppStore();
 const relationships = ref<any[]>([]);
-const voiceProfiles = ref<any[]>([]); // TODO: Load from API
+const voiceProfiles = ref<any[]>([]);
 
 // Computed statistics
 const approvedCount = computed(() => 
@@ -230,11 +230,12 @@ const approvedCount = computed(() =>
 );
 
 const voiceCount = computed(() => 
-  relationships.value.filter(r => hasVoice(r)).length
+  voiceProfiles.value.length
 );
 
 const onChainCount = computed(() => 
-  relationships.value.filter(r => isOnChain(r)).length
+  relationships.value.filter(r => isOnChain(r)).length + 
+  voiceProfiles.value.filter(v => v.blockchain_minted).length
 );
 
 onMounted(() => {
@@ -247,22 +248,29 @@ async function loadData() {
   if (!appStore.currentUserId) return;
   
   try {
-    const data = await listRelationships(appStore.currentUserId);
-    relationships.value = data;
-    // TODO: Load voice profiles
+    const [relData, voiceData] = await Promise.all([
+      listRelationships(appStore.currentUserId),
+      listVoiceProfiles(appStore.currentUserId)
+    ]);
+    relationships.value = relData;
+    voiceProfiles.value = voiceData;
   } catch (error) {
-    console.error('Failed to load data:', error);
+    console.error('Failed to load user profile data:', error);
+    ElMessage.error('Failed to load profile data');
   }
 }
 
-function hasVoice(member: any): boolean {
-  // TODO: Check if voice profile exists for this member
-  // For now, check if there's a voice_profile_id or similar field
-  return member.voice_profile_id != null || member.has_voice;
+function hasVoice(member: any) {
+  return voiceProfiles.value.some(v => v.relationship_id === member.id);
 }
 
-function isOnChain(member: any): boolean {
-  return !!(member.on_chain_ipfs_hash || member.blockchain_tx_hash);
+function getVoiceForMember(member: any) {
+  return voiceProfiles.value.find(v => v.relationship_id === member.id);
+}
+
+function isOnChain(member: any) {
+  const voice = getVoiceForMember(member);
+  return member.blockchain_minted || (voice && voice.blockchain_minted);
 }
 
 function getMemberCardClass(member: any): string {

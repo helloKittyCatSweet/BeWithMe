@@ -1,6 +1,7 @@
 export interface RelationshipData {
   id?: number;
   user_id: number;
+  guardian_name?: string;
   relative_name: string;
   relationship_type: 'parent' | 'grandparent' | 'sibling' | 'child' | 'spouse' | 'other';
   purpose: string;
@@ -55,6 +56,7 @@ export interface AgentProfile {
   speech_patterns: string[];
   background_story?: string;
   memories?: string[];
+  voice_id?: string;
 }
 
 export interface ChatMessage {
