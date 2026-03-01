@@ -7,9 +7,30 @@
 ---
 
 ## 📺 项目演示 (Demo)
-> [!TIP]
-> **演示视频入口**：[点击查看演示视频](#) (即将上线)  
-> **核心 UI 展示**：[查看截图库](docs/screenshots/) (包含手机通话、W&B 监控等)
+
+### 1. 登录与安全认证
+用户通过安全登录进入系统，保障隐私数据安全。
+![登录界面](docs/login.PNG)
+
+### 2. 创建数字亲人 (Create Agent)
+轻松设定亲人的人格特征，上传照片，开启数字生命。
+![创建代理](docs/create-agent.PNG)
+
+### 3. 声音克隆 (Voice Cloning)
+上传一段30秒的音频，即可复刻亲人的声音，支持多种情感表达。
+![声音克隆](docs/voice-cloning.PNG)
+
+### 4. 沉浸式通话体验 (Phone Call)
+核心功能：拟真的通话界面，支持实时语音对话，情感细腻，仿佛亲人在侧。
+![通话界面](docs/phone-call.PNG)
+
+### 5. 情感资产确权与认证 (Blockchain Verification)
+利用区块链技术确权，每一次对话、每一段记忆都可追溯、不可篡改。
+![区块链认证](docs/family-verification.PNG)
+
+### 6. 信任与安全架构 (Trust & Security)
+多层次的安全防护体系，保护您的情感数据。
+![安全架构](docs/trust&security.PNG)
 
 ---
 
@@ -80,7 +101,7 @@ graph TD
 | **微调监控** | **W&B (Weights & Biases)** | 实时监控微调实验过程中的各项指标 |
 | **效果评估** | **W&B Weave** | 用于多版本模型的效果对比与性能评估 |
 | **后端框架** | **FastAPI** | 高性能异步 Python 框架，处理所有核心业务流 |
-| **前端 UI** | **Streamlit** | 响应式 Web 界面，提供沉浸式交互体验 |
+| **前端 UI** | **Vue.js 3 + TypeScript** | 现代化响应式 Web 界面，提供沉浸式交互体验 |
 | **存证 (权属)** | **Solidity + Sepolia** | 智能合约管理 IPFS 哈希，实现情感资产确权 |
 
 ---

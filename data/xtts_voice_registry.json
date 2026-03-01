@@ -5,5 +5,12 @@
     "description": "克隆的亲人声音",
     "language": "zh-cn",
     "ref_audio_path": "data/xtts_reference_audio/xtts_271f2021d5d9.mp3"
+  },
+  "xtts_a5b1fe2cf570": {
+    "voice_id": "xtts_a5b1fe2cf570",
+    "name": "xtts_a5b1fe2cf570",
+    "description": "Recovered XTTS voice profile",
+    "language": "zh-cn",
+    "ref_audio_path": "data/voice_samples/voice_1_xtts_a5b1fe2cf570.mp3"
   }
 }

@@ -7,9 +7,30 @@ Built for the [NVIDIA Mistral Worldwide Hackathon 2026](https://worldwide-hackat
 ---
 
 ## � Demo
-> [!TIP]
-> **Demo Video**: [Watch Demo Video](#) (Coming Soon)  
-> **Core UI Showcase**: [View Screenshot Gallery](docs/screenshots/) (Includes Call UI, W&B Dashboard, etc.)
+
+### 1. Login & Security Authentication
+Secure login portal ensuring privacy and data protection.
+![Login Interface](docs/login.PNG)
+
+### 2. Create Digital Loved One (Create Agent)
+Easily configure personality traits, upload photos, and initiate a digital life.
+![Create Agent](docs/create-agent.PNG)
+
+### 3. Voice Cloning
+Upload a 30-second audio clip to replicate a loved one's voice, supporting various emotional expressions.
+![Voice Cloning](docs/voice-cloning.PNG)
+
+### 4. Immersive Phone Call Experience
+Core Feature: Realistic call interface supporting real-time voice conversations, delivering emotional comfort as if they were by your side.
+![Phone Call Interface](docs/phone-call.PNG)
+
+### 5. Emotional Asset Ownership & Verification
+Leveraging blockchain technology for ownership verification, ensuring every conversation and memory is traceable and immutable.
+![Blockchain Verification](docs/family-verification.PNG)
+
+### 6. Trust & Security Architecture
+Multi-layered security framework protecting your emotional data.
+![Trust & Security](docs/trust&security.PNG)
 
 ---
 
@@ -80,7 +101,7 @@ graph TD
 | **Monitoring** | **W&B (Weights & Biases)** | Real-time tracking of fine-tuning metrics |
 | **Evaluation** | **W&B Weave** | Comparison of model versions and performance evaluation |
 | **Backend** | **FastAPI** | High-performance async Python framework for business flow |
-| **Frontend** | **Streamlit** | Responsive Web UI for an immersive user experience |
+| **Frontend** | **Vue.js 3 + TypeScript** | Modern responsive Web UI for an immersive user experience |
 | **Web3 (Ownership)** | **Solidity + Sepolia** | Smart contracts managing IPFS hashes for asset ownership |
 
 ---
